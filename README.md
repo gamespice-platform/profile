@@ -1,11 +1,35 @@
 # dot-profile
 
-Per-entity yml profiles for the dot-* family: one file per NPC, weapon or player class instead of one big config. `DotProfileSet` lists, loads and validates a kind's profiles, `DotProfile` is one loaded profile, and `DotProfileRuntime` applies permission-gated live edits on a server. Tiers (addon, game, user, server), `extends`, `extra:`, folder profiles with child sets, environment and command-line overrides, and a headless validator (`tools/profile_check.gd`).
+One YAML file per NPC, weapon or player class, instead of one big config.
 
-Only dot-core is required. The cfg paths and file formats are dot-core's (`cfg/addon/<addon>/…`, `cfg/game/<game>/…`, `cfg/server/addon/<addon>/…`, `cfg/server/game/<game>/…`). The classes were part of dot-core until its API level 22; their names did not change.
+- `DotProfileSet` lists, loads and validates all profiles of one kind.
+- `DotProfile` is one loaded profile.
+- `DotProfileRuntime` applies live edits on a server, gated by permission.
 
-See [docs/profiles.md](docs/profiles.md).
+Features: tiers (addon, game, user, server), `extends`, `extra:` values, folder profiles with child sets, environment and command-line overrides, and a headless validator (`tools/profile_check.gd`).
 
-## Developing
+## Install
+
+1. Copy `addons/dot_profile/` and dot-core's `addons/dot_core/` into your project.
+2. Enable them in *Project > Project Settings > Plugins*.
+
+Only dot-core is required. Config paths and file formats are dot-core's:
+
+| Tier | Path |
+| --- | --- |
+| Addon | `cfg/addon/<addon>/` |
+| Game | `cfg/game/<game>/` |
+| Server addon | `cfg/server/addon/<addon>/` |
+| Server game | `cfg/server/game/<game>/` |
+
+These classes used to live in dot-core (before API level 22); their names did not change. Full reference: [docs/profiles.md](docs/profiles.md).
+
+## Develop
 
 Link dot-core (`ln -s ../../dot-core/addons/dot_core addons/dot_core`), import the project once, then run the scenes in `examples/`: `profile_selftest`, `profile_runtime_selftest`, `profile_check_selftest` and `user_tier_selftest`.
+
+## Status and licence
+
+Part of the TMC **dot-\*** family of Godot addons. Written with Claude Code and maintained by `gamemann`. Every addon has headless tests, but little of this has been played by real users yet, so expect rough edges and please [open an issue](https://github.com/modcommunity/dot-profile/issues) when you hit one.
+
+MIT licence, see [LICENSE](LICENSE). The only closed part of the TMC platform is the web back end; you can use your own instead of TMC's.
