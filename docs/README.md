@@ -1,4 +1,4 @@
-# dot-profile docs
+# GameSpice Profile docs
 
 | File | What |
 | --- | --- |

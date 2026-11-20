@@ -11,7 +11,7 @@ const POLARITIES: Array[String] = ["positive", "negative", "mixed"]
 const IMPACTS: Array[String] = ["self", "radius", "everyone", "game"]
 const DURATION_MODES: Array[String] = ["instant", "seconds", "round"]
 const DROP_SOURCES: Array[String] = ["common", "special", "brute", "map"]
-## Sound events; the same list as dot-audio's DotBoxSounds.EVENTS (dot-profile must not depend on dot-audio).
+## Sound events; the same list as GameSpice Audio's DotBoxSounds.EVENTS (GameSpice Profile must not depend on GameSpice Audio).
 const LIST_KEY := "_list"
 const SOUND_EVENTS: Array[String] = ["spawn", "approach", "open", "reward", "deny", "effect_end"]
 const SOUND_MODES: Array[String] = ["3d", "ui"]

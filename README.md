@@ -10,10 +10,10 @@ Features: tiers (addon, game, user, server), `extends`, `extra:` values, folder 
 
 ## Install
 
-1. Copy `addons/dot_profile/` and dot-core's `addons/dot_core/` into your project.
+1. Copy `addons/dot_profile/` and GameSpice Core's `addons/dot_core/` into your project.
 2. Enable them in *Project > Project Settings > Plugins*.
 
-Only dot-core is required. Config paths and file formats are dot-core's:
+Only GameSpice Core is required. Config paths and file formats are GameSpice Core's:
 
 | Tier | Path |
 | --- | --- |
@@ -22,7 +22,7 @@ Only dot-core is required. Config paths and file formats are dot-core's:
 | Server addon | `cfg/server/addon/<addon>/` |
 | Server game | `cfg/server/game/<game>/` |
 
-These classes used to live in dot-core (before API level 22); their names did not change. Full reference: [docs/profiles.md](docs/profiles.md).
+These classes used to live in GameSpice Core (before API level 22); their names did not change. Full reference: [docs/profiles.md](docs/profiles.md).
 
 ## Develop
 

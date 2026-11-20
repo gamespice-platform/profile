@@ -1,8 +1,8 @@
-# dot-profile
+# GameSpice Profile
 
 `DotProfileSet`, `DotProfile` and `DotProfileRuntime`: per-entity yml profiles, split out of dot-core at its API level 22. Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is specific here.
 
-**Only dot-core is a dependency** (>= 21), linked in `.gitignore` for the suites. dot-core must never name these classes; what both need (`DotAddonConfig.merge`, `set_nested`, `is_finite_value`, `check_field`, `DotYaml.emit`, the user-tier flag) lives in dot-core.
+**Only GameSpice Core is a dependency** (>= 21), linked in `.gitignore` for the suites. GameSpice Core must never name these classes; what both need (`DotAddonConfig.merge`, `set_nested`, `is_finite_value`, `check_field`, `DotYaml.emit`, the user-tier flag) lives in GameSpice Core.
 
 ## Read before
 

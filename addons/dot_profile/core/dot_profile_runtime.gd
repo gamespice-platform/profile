@@ -20,9 +20,9 @@ signal profile_changed(kind: String, id: String, revision: int)
 
 ## `(actor, flag: String) -> bool`. Unset means everything is denied.
 var permit: Callable = Callable()
-## Flag needed to edit or reset; dot-server's `DotAdminFlags.CVAR`.
+## Flag needed to edit or reset; GameSpice Server's `DotAdminFlags.CVAR`.
 var edit_flag := "cvar"
-## Flag needed to write cfg/server; dot-server's `DotAdminFlags.ROOT`.
+## Flag needed to write cfg/server; GameSpice Server's `DotAdminFlags.ROOT`.
 var save_flag := "root"
 ## `(row: Dictionary) -> void`: send to every client.
 var broadcast: Callable = Callable()
