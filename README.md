@@ -1,4 +1,4 @@
-[![Profile - GameSpice addon](docs/banner.png)](https://moddingcommunity.com/a/270-dot-profile)
+[![Profile - GameSpice addon](docs/banner.png)](https://moddingcommunity.com/a/110-gs-profile)
 
 One YAML file per NPC, weapon or player class, instead of one big config.
 
