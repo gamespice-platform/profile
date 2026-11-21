@@ -30,7 +30,7 @@ func _on_record(rec: Dictionary) -> void:
 
 
 func _run() -> void:
-	_line("dot-profile profile runtime self-test")
+	_line("gs-profile profile runtime self-test")
 	_clean()
 	_test_edit()
 	_test_refused()
@@ -69,8 +69,8 @@ func _schema() -> Array:
 ## Fresh files, a server runtime on one side, a client on the other.
 func _world() -> Dictionary:
 	_clean()
-	_w("addon/dot-npc/npc/zombie.yml", "health: 50\nspeed: 2.5\n")
-	_w("addon/dot-npc/npc/ghoul.yml", "health: 20\n")
+	_w("addon/gs-npc/npc/zombie.yml", "health: 50\nspeed: 2.5\n")
+	_w("addon/gs-npc/npc/ghoul.yml", "health: 20\n")
 	var server_set := _mk()
 	var client_set := _mk()
 	var server := GSProfileRuntime.new()
@@ -89,7 +89,7 @@ func _world() -> Dictionary:
 
 
 func _mk() -> GSProfileSet:
-	var s := GSProfileSet.create("dot-npc", "mygame", "npc", _schema())
+	var s := GSProfileSet.create("gs-npc", "mygame", "npc", _schema())
 	s.roots = PackedStringArray([BASE])
 	s.override_prefix = "prt"
 	return s
@@ -278,7 +278,7 @@ func _test_audit() -> void:
 func _test_nested() -> void:
 	_section("edits survive extends and the cache")
 	var w := _world()
-	_w("addon/dot-npc/npc/boss.yml", "extends: zombie\nhealth: 500\n")
+	_w("addon/gs-npc/npc/boss.yml", "extends: zombie\nhealth: 500\n")
 	var server: GSProfileRuntime = w["server"]
 	var before: Variant = _val(w["ss"], "boss", "health")
 	server.handle_request("admin", _req("set", "zombie", "health", 1))

@@ -10,7 +10,7 @@ Features: tiers (addon, game, user, server), `extends`, `extra:` values, folder 
 
 ## Install
 
-1. Copy `addons/dot_profile/` and GameSpice Core's `addons/dot_core/` into your project.
+1. Copy `addons/gs_profile/` and GameSpice Core's `addons/gs_core/` into your project.
 2. Enable them in *Project > Project Settings > Plugins*.
 
 Only GameSpice Core is required. Config paths and file formats are GameSpice Core's:
@@ -26,7 +26,7 @@ These classes used to live in GameSpice Core (before API level 22); their names 
 
 ## Develop
 
-Link dot-core (`ln -s ../../dot-core/addons/dot_core addons/dot_core`), import the project once, then run the scenes in `examples/`: `profile_selftest`, `profile_runtime_selftest`, `profile_check_selftest` and `user_tier_selftest`.
+Link gs-core (`ln -s ../../gs-core/addons/gs_core addons/gs_core`), import the project once, then run the scenes in `examples/`: `profile_selftest`, `profile_runtime_selftest`, `profile_check_selftest` and `user_tier_selftest`.
 
 ## Status and licence
 

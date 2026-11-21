@@ -4,7 +4,7 @@ extends Node
 ## Armed by construction: every bad file must be named, every good one must not be.
 ## Run: godot --headless --path . res://examples/profile_check_selftest.tscn
 
-const TOOL := "res://addons/dot_profile/tools/profile_check.gd"
+const TOOL := "res://addons/gs_profile/tools/profile_check.gd"
 const DUP := "res://examples/profile_check_dup_schema.gd"
 const BADSCHEMA := "res://examples/profile_check_bad_schema.gd"
 const BASE := "user://profile_check_selftest"
@@ -50,7 +50,7 @@ var _failed := 0
 
 
 func _ready() -> void:
-	print("dot-profile profile_check self-test")
+	print("gs-profile profile_check self-test")
 	var root := ProjectSettings.globalize_path(BASE)
 	for f in BAD:
 		_write(root, f, BAD[f])

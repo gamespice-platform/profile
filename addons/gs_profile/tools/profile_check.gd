@@ -1,7 +1,7 @@
 extends SceneTree
 
 ## Checks every profile yml under a repository's cfg/ against its schema, with no game running, and exits 1 on any error.
-## Run: godot --headless --path . --script addons/dot_profile/tools/profile_check.gd -- <dir>... [--schema <script>]... [--skip-unknown]
+## Run: godot --headless --path . --script addons/gs_profile/tools/profile_check.gd -- <dir>... [--schema <script>]... [--skip-unknown]
 ## Loads every profile through [GSProfileSet] (the game's own verdict); schemas come from global classes with [code]static func profile_schemas()[/code] or [code]--schema[/code]; no [code]class_name[/code].
 
 var _providers: Dictionary = {}

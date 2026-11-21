@@ -18,7 +18,7 @@ func _ready() -> void:
 
 
 func _run() -> void:
-	_line("dot-profile profile self-test")
+	_line("gs-profile profile self-test")
 	_clean()
 	_test_schema()
 	_test_extends()
@@ -56,7 +56,7 @@ func _schema() -> Array:
 
 
 func _mk(kind: String = "npc", schema: Array = []) -> GSProfileSet:
-	var s := GSProfileSet.create("dot-npc", "mygame", kind, schema if not schema.is_empty() else _schema())
+	var s := GSProfileSet.create("gs-npc", "mygame", kind, schema if not schema.is_empty() else _schema())
 	s.roots = PackedStringArray([BASE])
 	s.override_prefix = "pst"
 	return s
@@ -71,7 +71,7 @@ func _w(rel: String, text: String) -> void:
 
 
 func _addon(rel: String, text: String) -> void:
-	_w("addon/dot-npc/" + rel, text)
+	_w("addon/gs-npc/" + rel, text)
 
 
 func _gamef(rel: String, text: String) -> void:
@@ -181,7 +181,7 @@ func _test_tiers() -> void:
 	two.roots = PackedStringArray([BASE + "_x", BASE])
 	_check(two.load_profile("orc").value.get_value("health") == 175, "a later root wins within a tier")
 	_rm(BASE + "_x")
-	_w("server/addon/dot-npc/npc/orc.yml", "health: 222\n")
+	_w("server/addon/gs-npc/npc/orc.yml", "health: 222\n")
 	_w("server/npc/orc.yml", "health: 333\n")
 	DirAccess.make_dir_recursive_absolute(BASE + "_x/server/game/mygame/npc")
 	var gf := FileAccess.open(BASE + "_x/server/game/mygame/npc/orc.yml", FileAccess.WRITE)
@@ -202,7 +202,7 @@ func _test_tiers() -> void:
 	bad.game = "a/b"
 	bad.clear_cache()
 	_check(bad.load_profile("orc").value.get_value("health") != 888, "a game name with / is skipped")
-	_check(_mk("npc").game == "mygame" and GSProfileSet.create("dot-npc", "", "npc").has_id("orc") == false, "no game id skips the game tier")
+	_check(_mk("npc").game == "mygame" and GSProfileSet.create("gs-npc", "", "npc").has_id("orc") == false, "no game id skips the game tier")
 
 
 func _test_former_game() -> void:
@@ -226,7 +226,7 @@ func _test_plural_legacy() -> void:
 	_addon("npc/orc.yml", "health: 100\n")
 	_check(_mk().load_profile("orc").value.get_value("health") == 100 and GSCfgLegacy.warned_count() == 0, "a singular addon file is read with no warning")
 	_clean()
-	_w("addons/dot-npc/npc/orc.yml", "health: 120\nspeed: 9.0\n")
+	_w("addons/gs-npc/npc/orc.yml", "health: 120\nspeed: 9.0\n")
 	var r := _mk().load_profile("orc")
 	_check(r.ok and r.value.get_value("health") == 120 and r.value.get_value("speed") == 9.0, "cfg/addons/<addon>/ is still read")
 	_check(GSCfgLegacy.warned_count() == 1, "with one warning")
@@ -236,7 +236,7 @@ func _test_plural_legacy() -> void:
 	_check(r.value.get_value("speed") != 9.0, "whole: nothing of the plural file is merged")
 	_w("games/mygame/npc/orc.yml", "health: 140\n")
 	_check(_mk().load_profile("orc").value.get_value("health") == 140, "cfg/games/<game>/ is still read")
-	_w("server/addons/dot-npc/npc/orc.yml", "health: 150\n")
+	_w("server/addons/gs-npc/npc/orc.yml", "health: 150\n")
 	_check(_mk().load_profile("orc").value.get_value("health") == 150, "cfg/server/addons/<addon>/ is still read")
 	_w("server/games/mygame/npc/orc.yml", "health: 160\n")
 	_check(_mk().load_profile("orc").value.get_value("health") == 160, "cfg/server/games/<game>/ is still read")
