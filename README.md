@@ -2,9 +2,9 @@
 
 One YAML file per NPC, weapon or player class, instead of one big config.
 
-- `DotProfileSet` lists, loads and validates all profiles of one kind.
-- `DotProfile` is one loaded profile.
-- `DotProfileRuntime` applies live edits on a server, gated by permission.
+- `GSProfileSet` lists, loads and validates all profiles of one kind.
+- `GSProfile` is one loaded profile.
+- `GSProfileRuntime` applies live edits on a server, gated by permission.
 
 Features: tiers (addon, game, user, server), `extends`, `extra:` values, folder profiles with child sets, environment and command-line overrides, and a headless validator (`tools/profile_check.gd`).
 

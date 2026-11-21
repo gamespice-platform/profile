@@ -12,7 +12,7 @@ var _section_count := 0
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.ERROR)
+	GSLog.set_level(GSLog.Level.ERROR)
 	_clean()
 	_defaults()
 	_validation()
@@ -27,8 +27,8 @@ func _ready() -> void:
 	get_tree().quit(1 if bad else 0)
 
 
-func _mk() -> DotProfileSet:
-	var s := DotBoxProfiles.make_set("mygame", PackedStringArray([BASE]))
+func _mk() -> GSProfileSet:
+	var s := GSBoxProfiles.make_set("mygame", PackedStringArray([BASE]))
 	s.override_prefix = "bps"
 	return s
 
@@ -62,18 +62,18 @@ func _defaults() -> void:
 	_section("defaults and a round trip")
 	_w("game/mygame/box/med.yml", "title: Medical\ncolour: '#44aa44'\npolarity: positive\ndrop:\n  common: 5\n  brute: 3\nduration:\n  mode: seconds\n  min: 30\n  max: 60\noutcomes:\n  - id: heal\n    weight: 3\n    actions:\n      - do: heal\n")
 	var s := _mk()
-	var res := DotBoxProfiles.load_box(s, "med")
+	var res := GSBoxProfiles.load_box(s, "med")
 	_ck(res.ok, "a box loads")
-	var p: DotProfile = res.value
+	var p: GSProfile = res.value
 	_ck(p.get_value("title") == "Medical" and p.get_value("polarity") == "positive", "keys read back")
 	_ck(p.get_value("impact") == "self" and p.get_value("max_stacks") == 99 and p.get_value("enabled") == true, "schema defaults fill the rest")
 	_ck((p.get_value("drop") as Dictionary).get("brute") == 3, "drop odds are a map")
 	_ck((p.get_value("outcomes") as Array).size() == 1 and p.get_value("sounds") == {}, "outcomes round trip; no sounds means stock")
 	_ck(s.list_ids() == PackedStringArray(["med"]), "listed")
 	var tree := {"title": "A \"q\"", "drop": {"common": 2.5, "map": 1}, "stacks": false, "radius": 6.0, "outcomes": [{"id": "x", "weight": 5, "actions": [{"do": "airstrike", "count": 3, "delay": 1.6}, {"do": "random", "choices": [[{"do": "heal"}], [{"do": "mob"}, {"do": "heal"}]]}]}], "sounds": {}}
-	_w("game/mygame/box/rt.yml", DotBoxProfiles.to_yaml(tree))
-	var back: DotProfile = DotBoxProfiles.load_box(_mk(), "rt").value
-	_ck(back.get_value("title") == "A \"q\"" and back.get_value("drop") == {"common": 2.5, "map": 1} and DotBoxProfiles.unwrap_lists(back.get_value("outcomes")) == tree["outcomes"] and back.get_value("radius") == 6.0, "to_yaml reads back as the same tree")
+	_w("game/mygame/box/rt.yml", GSBoxProfiles.to_yaml(tree))
+	var back: GSProfile = GSBoxProfiles.load_box(_mk(), "rt").value
+	_ck(back.get_value("title") == "A \"q\"" and back.get_value("drop") == {"common": 2.5, "map": 1} and GSBoxProfiles.unwrap_lists(back.get_value("outcomes")) == tree["outcomes"] and back.get_value("radius") == 6.0, "to_yaml reads back as the same tree")
 
 
 func _validation() -> void:
@@ -95,13 +95,13 @@ func _validation() -> void:
 	var s := _mk()
 	var wrong := 0
 	for k in cases:
-		if DotBoxProfiles.load_box(s, k).ok:
+		if GSBoxProfiles.load_box(s, k).ok:
 			wrong += 1
 			print("  accepted: " + k)
 	_ck(wrong == 0, "all ten bad files are refused")
 	_w("game/mygame/box/good.yml", "duration:\n  mode: round\nsounds:\n  effect_end:\n    sound: res://a.ogg\n    volume: 1.5\n    pitch_jitter: 0.1\n    mode: ui\n  open:\n    enabled: false\n")
-	_ck(DotBoxProfiles.load_box(_mk(), "good").ok, "a sound slot per event with every key is accepted")
-	var r := DotBoxProfiles.load_box(s, "badvol")
+	_ck(GSBoxProfiles.load_box(_mk(), "good").ok, "a sound slot per event with every key is accepted")
+	var r := GSBoxProfiles.load_box(s, "badvol")
 	_ck(not r.ok and str(r.error.detail).contains("volume"), "the refusal names the key")
 
 
@@ -109,7 +109,7 @@ func _server_override() -> void:
 	_section("per-server override")
 	_w("game/mygame/box/srv.yml", "title: Shipped\ndrop:\n  common: 4\nsounds:\n  open:\n    volume: 1.0\n")
 	_w("server/game/mygame/box/srv.yml", "title: Ours\nsounds:\n  open:\n    volume: 2.5\n")
-	var p: DotProfile = DotBoxProfiles.load_box(_mk(), "srv").value
+	var p: GSProfile = GSBoxProfiles.load_box(_mk(), "srv").value
 	_ck(p.get_value("title") == "Ours", "the server tier wins")
 	_ck((p.get_value("sounds") as Dictionary)["open"]["volume"] == 2.5, "down to one slot's volume")
 	_ck((p.get_value("drop") as Dictionary)["common"] == 4, "keys the server file omits keep the game's")
@@ -119,28 +119,28 @@ func _live_edit() -> void:
 	_section("live edit through the runtime")
 	_w("game/mygame/box/live.yml", "title: Live\n")
 	var s := _mk()
-	var rt := DotProfileRuntime.new()
+	var rt := GSProfileRuntime.new()
 	rt.add_set(s)
 	rt.save_root = BASE
 	rt.permit = func(_a: Variant, _f: String) -> bool: return true
-	var ok := rt.handle_request("admin", DotProfileRuntime.make_request("set", "box", "live", "sounds.reward.volume", 3.0))
-	_ck(ok.ok and (DotBoxProfiles.load_box(s, "live").value.get_value("sounds") as Dictionary)["reward"]["volume"] == 3.0, "a slot's volume is editable live")
-	var bad := rt.handle_request("admin", DotProfileRuntime.make_request("set", "box", "live", "sounds.reward.volume", 99.0))
+	var ok := rt.handle_request("admin", GSProfileRuntime.make_request("set", "box", "live", "sounds.reward.volume", 3.0))
+	_ck(ok.ok and (GSBoxProfiles.load_box(s, "live").value.get_value("sounds") as Dictionary)["reward"]["volume"] == 3.0, "a slot's volume is editable live")
+	var bad := rt.handle_request("admin", GSProfileRuntime.make_request("set", "box", "live", "sounds.reward.volume", 99.0))
 	_ck(not bad.ok, "an out-of-range slot value is refused")
-	_ck((DotBoxProfiles.load_box(s, "live").value.get_value("sounds") as Dictionary)["reward"]["volume"] == 3.0, "and rolled back")
-	var bad2 := rt.handle_request("admin", DotProfileRuntime.make_request("set", "box", "live", "duration", {"mode": "seconds", "min": 5, "max": 2}))
+	_ck((GSBoxProfiles.load_box(s, "live").value.get_value("sounds") as Dictionary)["reward"]["volume"] == 3.0, "and rolled back")
+	var bad2 := rt.handle_request("admin", GSProfileRuntime.make_request("set", "box", "live", "duration", {"mode": "seconds", "min": 5, "max": 2}))
 	_ck(not bad2.ok, "a reversed duration is refused")
-	_ck(rt.handle_request("admin", DotProfileRuntime.make_request("set", "box", "live", "drop.brute", 9)).ok, "a drop weight is editable")
-	var cp: DotProfile = DotBoxProfiles.load_box(s, "live").value
+	_ck(rt.handle_request("admin", GSProfileRuntime.make_request("set", "box", "live", "drop.brute", 9)).ok, "a drop weight is editable")
+	var cp: GSProfile = GSBoxProfiles.load_box(s, "live").value
 	_ck(cp.get_value("carryable") == true and cp.get_value("deploy_seconds") == 0.0, "carry and deploy default to the game's own")
-	_ck(rt.handle_request("admin", DotProfileRuntime.make_request("set", "box", "live", "deploy_seconds", 2.5)).ok and rt.handle_request("admin", DotProfileRuntime.make_request("set", "box", "live", "carryable", false)).ok, "carry and deploy are editable live")
-	_ck(not rt.handle_request("admin", DotProfileRuntime.make_request("set", "box", "live", "deploy_seconds", -1.0)).ok, "a negative deploy time is refused")
+	_ck(rt.handle_request("admin", GSProfileRuntime.make_request("set", "box", "live", "deploy_seconds", 2.5)).ok and rt.handle_request("admin", GSProfileRuntime.make_request("set", "box", "live", "carryable", false)).ok, "carry and deploy are editable live")
+	_ck(not rt.handle_request("admin", GSProfileRuntime.make_request("set", "box", "live", "deploy_seconds", -1.0)).ok, "a negative deploy time is refused")
 
 
 func _check_tool() -> void:
 	_section("schemas for tools")
-	var ps := DotBoxProfiles.profile_schemas()
-	_ck(ps.has("box") and (ps["box"]["schema"] as Array).size() == DotBoxProfiles.schema().size(), "profile_schemas names the kind")
-	var names := (DotBoxProfiles.schema() as Array).map(func(f: Dictionary) -> String: return f["name"])
+	var ps := GSBoxProfiles.profile_schemas()
+	_ck(ps.has("box") and (ps["box"]["schema"] as Array).size() == GSBoxProfiles.schema().size(), "profile_schemas names the kind")
+	var names := (GSBoxProfiles.schema() as Array).map(func(f: Dictionary) -> String: return f["name"])
 	for k in ["title", "colour", "drop", "duration", "outcomes", "sounds", "open_seconds", "lifetime", "enabled", "carryable", "deploy_seconds"]:
 		_ck(k in names, "schema has " + k)

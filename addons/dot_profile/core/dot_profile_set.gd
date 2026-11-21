@@ -1,4 +1,4 @@
-class_name DotProfileSet
+class_name GSProfileSet
 extends RefCounted
 
 ## A directory of per-entity profiles (NPCs, weapons, classes): lists, loads and validates them. See docs/profiles.md.
@@ -22,9 +22,9 @@ const TIER_SERVER := "server"
 ## must never obey a file on the player's disk. The solo or listen-host game turns it on.
 static var user_tier_enabled: bool:
 	get:
-		return DotAddonConfig.user_tier_enabled
+		return GSAddonConfig.user_tier_enabled
 	set(value):
-		DotAddonConfig.user_tier_enabled = value
+		GSAddonConfig.user_tier_enabled = value
 
 ## Owning addon (`cfg/addon/<addon>/`), empty to skip the addon tier.
 var addon_name := ""
@@ -54,17 +54,17 @@ var cmdline := PackedStringArray()
 var user_root := "user://cfg"
 
 ## Runtime layer, above every file tier: profile id -> {dotted path: value}. Written by
-## [DotProfileRuntime]; `extra.a.b` paths land in `extra`, `stats.hp` in a dict field.
+## [GSProfileRuntime]; `extra.a.b` paths land in `extra`, `stats.hp` in a dict field.
 var runtime: Dictionary = {}
-## Optional `func(profile: DotProfile) -> DotResult`, run after the schema on every load: the keys a schema cannot say (a map's contents). A failure refuses the load, so a live edit that breaks it is rolled back.
+## Optional `func(profile: GSProfile) -> GSResult`, run after the schema on every load: the keys a schema cannot say (a map's contents). A failure refuses the load, so a live edit that breaks it is rolled back.
 var validator: Callable = Callable()
 
 var _cache: Dictionary = {}
 
 
 ## Builds a set for [param p_rel_path] (a singular kind such as `npc`) and its [param p_schema].
-static func create(p_addon: String, p_game: String, p_rel_path: String, p_schema: Array = []) -> DotProfileSet:
-	var s := DotProfileSet.new()
+static func create(p_addon: String, p_game: String, p_rel_path: String, p_schema: Array = []) -> GSProfileSet:
+	var s := GSProfileSet.new()
 	s.addon_name = p_addon
 	s.game = p_game
 	s.rel_path = p_rel_path
@@ -82,7 +82,7 @@ static func field(p_name: String, type: String, default: Variant = null, opts: D
 
 ## Turns the user tier on for a solo or listen-host process, off for a server or a connected client.
 static func set_user_tier(enabled: bool) -> void:
-	DotAddonConfig.user_tier_enabled = enabled
+	GSAddonConfig.user_tier_enabled = enabled
 
 
 ## Config roots, weakest first: `res://cfg`, next to the executable, `user://cfg`, `--config DIR`.
@@ -92,7 +92,7 @@ static func default_roots() -> PackedStringArray:
 	if exe != "":
 		out.append(exe.path_join("cfg"))
 	out.append("user://cfg")
-	var given := DotAddonConfig._config_dir_arg()
+	var given := GSAddonConfig._config_dir_arg()
 	if given != "":
 		out.append(given)
 	return out
@@ -138,23 +138,23 @@ func is_removed(id: String) -> bool:
 
 
 ## Makes a new profile [param id] that exists in the runtime layer only. Refuses a taken or bad id.
-func add_id(id: String) -> DotResult:
+func add_id(id: String) -> GSResult:
 	if not _id_ok(id):
-		return DotResult.fail(DotError.CODE_INVALID, "bad profile id")
+		return GSResult.fail(GSError.CODE_INVALID, "bad profile id")
 	if has_id(id):
-		return DotResult.fail(DotError.CODE_INVALID, "%s/%s: already exists" % [rel_path, id])
+		return GSResult.fail(GSError.CODE_INVALID, "%s/%s: already exists" % [rel_path, id])
 	removed_ids.erase(id)
 	if not added_ids.has(id):
 		added_ids.append(id)
 	_cache.erase(id)
-	return DotResult.success(id)
+	return GSResult.success(id)
 
 
 ## Hides [param id] and drops its runtime layer. Files in lower tiers are not touched (see
-## [method DotProfileRuntime.handle_request] for the file side).
-func remove_id(id: String) -> DotResult:
+## [method GSProfileRuntime.handle_request] for the file side).
+func remove_id(id: String) -> GSResult:
 	if not has_id(id):
-		return DotResult.fail(DotError.CODE_INVALID, "%s/%s: no such profile" % [rel_path, id])
+		return GSResult.fail(GSError.CODE_INVALID, "%s/%s: no such profile" % [rel_path, id])
 	var at := added_ids.find(id)
 	if at >= 0:
 		added_ids.remove_at(at)
@@ -162,15 +162,15 @@ func remove_id(id: String) -> DotResult:
 		removed_ids.append(id)
 	runtime.erase(id)
 	_cache.erase(id)
-	return DotResult.success(id)
+	return GSResult.success(id)
 
 
-## Loads, extends-resolves, overrides and validates one profile. Value: a [DotProfile].
-func load_profile(id: String) -> DotResult:
+## Loads, extends-resolves, overrides and validates one profile. Value: a [GSProfile].
+func load_profile(id: String) -> GSResult:
 	if _cache.has(id):
-		return DotResult.success(_cache[id])
+		return GSResult.success(_cache[id])
 	if is_removed(id):
-		return DotResult.fail(DotError.CODE_INVALID, "%s/%s: removed" % [rel_path, id])
+		return GSResult.fail(GSError.CODE_INVALID, "%s/%s: removed" % [rel_path, id])
 	var res := _load(id)
 	if res.ok and validator.is_valid():
 		res = validator.call(res.value)
@@ -200,34 +200,34 @@ func runtime_paths(id: String) -> Dictionary:
 
 ## Checks one runtime edit against the schema without applying it. Value: `{path, value}` with
 ## the value coerced to the field's type. NaN, infinity, unknown keys and secrets are refused.
-func check_edit(id: String, path: String, value: Variant) -> DotResult:
+func check_edit(id: String, path: String, value: Variant) -> GSResult:
 	if not has_id(id):
-		return DotResult.fail(DotError.CODE_INVALID, "%s: " % id + "no such profile")
+		return GSResult.fail(GSError.CODE_INVALID, "%s: " % id + "no such profile")
 	var parts := path.split(".")
 	if path.is_empty() or parts.has(""):
-		return DotResult.fail(DotError.CODE_INVALID, "%s: " % id + "bad key path '%s'" % path)
-	if not DotAddonConfig.is_finite_value(value):
-		return DotResult.fail(DotError.CODE_INVALID, "%s: " % id + "%s: NaN or infinity is refused" % path)
-	if DotAddonConfig._is_sensitive(parts[parts.size() - 1], sensitive):
-		return DotResult.fail(DotError.CODE_FORBIDDEN, "%s: " % id + "%s: secrets cannot be edited at runtime" % path)
+		return GSResult.fail(GSError.CODE_INVALID, "%s: " % id + "bad key path '%s'" % path)
+	if not GSAddonConfig.is_finite_value(value):
+		return GSResult.fail(GSError.CODE_INVALID, "%s: " % id + "%s: NaN or infinity is refused" % path)
+	if GSAddonConfig._is_sensitive(parts[parts.size() - 1], sensitive):
+		return GSResult.fail(GSError.CODE_FORBIDDEN, "%s: " % id + "%s: secrets cannot be edited at runtime" % path)
 	if parts[0] == EXTRA_KEY:
 		if parts.size() < 2:
-			return DotResult.fail(DotError.CODE_INVALID, "%s: " % id + "name a key under '%s'" % EXTRA_KEY)
-		return DotResult.success({"path": path, "value": value})
+			return GSResult.fail(GSError.CODE_INVALID, "%s: " % id + "name a key under '%s'" % EXTRA_KEY)
+		return GSResult.success({"path": path, "value": value})
 	var f := {}
 	for e in schema:
 		if e["name"] == parts[0]:
 			f = e
 	if f.is_empty():
-		return DotResult.fail(DotError.CODE_INVALID, "%s: " % id + "unknown key '%s'" % parts[0])
+		return GSResult.fail(GSError.CODE_INVALID, "%s: " % id + "unknown key '%s'" % parts[0])
 	if parts.size() > 1:
 		if f["type"] != "dict" and f["type"] != "any":
-			return DotResult.fail(DotError.CODE_INVALID, "%s: " % id + "%s is not a mapping" % parts[0])
-		return DotResult.success({"path": path, "value": value})
-	var checked := DotAddonConfig.check_field(f, value)
+			return GSResult.fail(GSError.CODE_INVALID, "%s: " % id + "%s is not a mapping" % parts[0])
+		return GSResult.success({"path": path, "value": value})
+	var checked := GSAddonConfig.check_field(f, value)
 	if checked.has("error"):
-		return DotResult.fail(DotError.CODE_INVALID, "%s: " % id + "%s: %s" % [path, checked["error"]])
-	return DotResult.success({"path": path, "value": checked["value"]})
+		return GSResult.fail(GSError.CODE_INVALID, "%s: " % id + "%s: %s" % [path, checked["error"]])
+	return GSResult.success({"path": path, "value": checked["value"]})
 
 
 ## Path of the user-tier file for [param id].
@@ -240,7 +240,7 @@ func user_paths(id: String) -> Dictionary:
 	var file := user_file(id)
 	if not _id_ok(id) or not FileAccess.file_exists(file):
 		return {}
-	var res := DotYaml.parse_file(file)
+	var res := GSYaml.parse_file(file)
 	var out := {}
 	if res.ok and res.value is Dictionary:
 		_flatten(res.value, "", out)
@@ -249,17 +249,17 @@ func user_paths(id: String) -> Dictionary:
 
 ## Writes [param paths] (`{dotted path: value}`) into the user file, keeping its other keys. Each
 ## is checked against the schema and the profile must still load, else the file is restored.
-func save_user(id: String, paths: Dictionary) -> DotResult:
+func save_user(id: String, paths: Dictionary) -> GSResult:
 	if not user_tier_enabled:
-		return DotResult.fail(DotError.CODE_STATE, "%s/%s: the user tier is off in this process" % [rel_path, id])
+		return GSResult.fail(GSError.CODE_STATE, "%s/%s: the user tier is off in this process" % [rel_path, id])
 	if not has_id(id):
-		return DotResult.fail(DotError.CODE_INVALID, "%s/%s: no such profile" % [rel_path, id])
+		return GSResult.fail(GSError.CODE_INVALID, "%s/%s: no such profile" % [rel_path, id])
 	var tree := {}
 	var file := user_file(id)
 	var had := FileAccess.file_exists(file)
 	var before := ""
 	if had:
-		var existing := DotYaml.parse_file(file)
+		var existing := GSYaml.parse_file(file)
 		if not existing.ok:
 			return existing.wrap("saving %s" % file)
 		if existing.value is Dictionary:
@@ -269,50 +269,50 @@ func save_user(id: String, paths: Dictionary) -> DotResult:
 		var ok := check_edit(id, String(path), paths[path])
 		if not ok.ok:
 			return ok
-		DotAddonConfig.set_nested(tree, String(path).split("."), ok.value["value"])
-	var text: Variant = DotYaml.emit(tree)
+		GSAddonConfig.set_nested(tree, String(path).split("."), ok.value["value"])
+	var text: Variant = GSYaml.emit(tree)
 	if text == null:
-		return DotResult.fail(DotError.CODE_INVALID, "%s/%s holds a value yml cannot carry" % [rel_path, id])
-	var dir := DotPaths.ensure_parent_dir(file)
+		return GSResult.fail(GSError.CODE_INVALID, "%s/%s holds a value yml cannot carry" % [rel_path, id])
+	var dir := GSPaths.ensure_parent_dir(file)
 	if not dir.ok:
 		return dir
-	var wrote := DotPaths.write_text(file, text)
+	var wrote := GSPaths.write_text(file, text)
 	if not wrote.ok:
 		return wrote.wrap("saving %s" % file)
 	_cache.erase(id)
 	var loaded := load_profile(id)
 	if not loaded.ok:
 		if had:
-			DotPaths.write_text(file, before)
+			GSPaths.write_text(file, before)
 		else:
 			DirAccess.remove_absolute(file)
 		_cache.erase(id)
-		DotWeb.sync_filesystem()
+		GSWeb.sync_filesystem()
 		return loaded
-	DotWeb.sync_filesystem()
-	DotLog.info(CHANNEL, "profile saved to user layer", {"kind": rel_path, "id": id, "keys": paths.size()})
-	return DotResult.success({"saved": file})
+	GSWeb.sync_filesystem()
+	GSLog.info(CHANNEL, "profile saved to user layer", {"kind": rel_path, "id": id, "keys": paths.size()})
+	return GSResult.success({"saved": file})
 
 
 ## Removes the user file of [param id]: back to the tiers below. Value: true when a file was removed.
-func reset_user(id: String) -> DotResult:
+func reset_user(id: String) -> GSResult:
 	if not _id_ok(id):
-		return DotResult.fail(DotError.CODE_INVALID, "bad profile id")
+		return GSResult.fail(GSError.CODE_INVALID, "bad profile id")
 	var file := user_file(id)
 	if not FileAccess.file_exists(file):
-		return DotResult.success(false)
+		return GSResult.success(false)
 	var err := DirAccess.remove_absolute(file)
 	if err != OK:
-		return DotResult.fail(DotError.CODE_IO, "cannot remove %s" % file)
+		return GSResult.fail(GSError.CODE_IO, "cannot remove %s" % file)
 	_cache.erase(id)
-	DotWeb.sync_filesystem()
-	DotLog.info(CHANNEL, "profile user layer reset", {"kind": rel_path, "id": id})
-	return DotResult.success(true)
+	GSWeb.sync_filesystem()
+	GSLog.info(CHANNEL, "profile user layer reset", {"kind": rel_path, "id": id})
+	return GSResult.success(true)
 
 
 ## The set below profile [param id]: `<rel>/<id>/<child_kind>`, with its own schema.
-func child_set(id: String, child_kind: String, child_schema: Array = []) -> DotProfileSet:
-	var s := DotProfileSet.create(addon_name, game, rel_path.path_join(id).path_join(child_kind), child_schema)
+func child_set(id: String, child_kind: String, child_schema: Array = []) -> GSProfileSet:
+	var s := GSProfileSet.create(addon_name, game, rel_path.path_join(id).path_join(child_kind), child_schema)
 	s.strict = strict
 	s.sensitive = sensitive
 	s.override_prefix = override_prefix
@@ -339,7 +339,7 @@ func describe() -> String:
 
 
 func describe_lines() -> PackedStringArray:
-	var out := PackedStringArray(["DotProfileSet %s (addon '%s', game '%s', %d fields, strict %s)" % [rel_path, addon_name, game, schema.size(), strict]])
+	var out := PackedStringArray(["GSProfileSet %s (addon '%s', game '%s', %d fields, strict %s)" % [rel_path, addon_name, game, schema.size(), strict]])
 	for tier in _tier_dirs():
 		for d in _tier_dirs()[tier]:
 			out.append("  %s: %s" % [tier, d])
@@ -368,15 +368,15 @@ func _tier_dirs(rel: String = "") -> Dictionary:
 	var use_addon := addon_name != ""
 	var use_game := game != ""
 	if use_addon and not _id_ok(addon_name):
-		push_error("DotProfileSet: bad addon name '%s'" % addon_name)
+		push_error("GSProfileSet: bad addon name '%s'" % addon_name)
 		use_addon = false
 	if use_game and not _id_ok(game):
-		push_error("DotProfileSet: bad game name '%s'" % game)
+		push_error("GSProfileSet: bad game name '%s'" % game)
 		use_game = false
 	# [tier, dir under a root, used, name, singular dir that supersedes it or ""], weakest first: an old
 	# plural dir or the pre-mirror cfg/server/<kind>/ comes before the singular one that wins over it.
-	# A renamed game's former ids (DotAddonConfig.register_former_game) are read under its own id.
-	var names: PackedStringArray = DotAddonConfig.game_names(game) if use_game else PackedStringArray()
+	# A renamed game's former ids (GSAddonConfig.register_former_game) are read under its own id.
+	var names: PackedStringArray = GSAddonConfig.game_names(game) if use_game else PackedStringArray()
 	var steps: Array = [[TIER_ADDON, "addons", use_addon, addon_name, "addon"], [TIER_ADDON, "addon", use_addon, addon_name, ""]]
 	for pair in [["games", "game"], ["game", ""]]:
 		for n in names:
@@ -414,14 +414,14 @@ func _tier_dirs(rel: String = "") -> Dictionary:
 var _legacy_new: Dictionary = {}
 
 
-## False when [param p] sits in an old plural dir or a pre-mirror `cfg/server/<kind>/` and [DotCfgLegacy] says not to read it.
+## False when [param p] sits in an old plural dir or a pre-mirror `cfg/server/<kind>/` and [GSCfgLegacy] says not to read it.
 func _legacy_ok(dir: String, p: String) -> bool:
 	if not _legacy_new.has(dir):
 		return true
 	var new_dir: String = _legacy_new[dir]
 	if new_dir == "":
 		return true
-	return DotCfgLegacy.find(p, new_dir.path_join(p.trim_prefix(dir + "/"))) == p
+	return GSCfgLegacy.find(p, new_dir.path_join(p.trim_prefix(dir + "/"))) == p
 
 
 ## [{path, tier}] for [param id], weakest first.
@@ -436,49 +436,49 @@ func _files_for(id: String) -> Array:
 	return out
 
 
-func _fail(code: String, id: String, msg: String) -> DotResult:
-	DotLog.error(CHANNEL, "profile failed", {"kind": rel_path, "id": id, "why": msg})
-	return DotResult.fail(code, "%s/%s: %s" % [rel_path, id, msg])
+func _fail(code: String, id: String, msg: String) -> GSResult:
+	GSLog.error(CHANNEL, "profile failed", {"kind": rel_path, "id": id, "why": msg})
+	return GSResult.fail(code, "%s/%s: %s" % [rel_path, id, msg])
 
 
 ## File-level resolution: tiers merged, then over its parent. {data, sources, chain}.
-func _raw(id: String, visiting: PackedStringArray) -> DotResult:
+func _raw(id: String, visiting: PackedStringArray) -> GSResult:
 	if not _id_ok(id):
-		return _fail(DotError.CODE_INVALID, id, "bad profile id")
+		return _fail(GSError.CODE_INVALID, id, "bad profile id")
 	var files := _files_for(id)
 	if files.is_empty() and not implicit_ids.has(id) and not added_ids.has(id):
-		return _fail(DotError.CODE_INVALID, id, "no such profile")
+		return _fail(GSError.CODE_INVALID, id, "no such profile")
 	var merged := {}
 	var sources := PackedStringArray()
 	for f in files:
-		var res := DotYaml.parse_file(f["path"])
+		var res := GSYaml.parse_file(f["path"])
 		if not res.ok:
-			DotLog.error(CHANNEL, "bad profile file", {"file": f["path"]})
+			GSLog.error(CHANNEL, "bad profile file", {"file": f["path"]})
 			return res.wrap("profile file %s" % f["path"])
 		if res.value == null:
 			continue
 		if not (res.value is Dictionary):
-			return _fail(DotError.CODE_PARSE, id, "%s must hold a mapping at the top level" % f["path"])
-		DotAddonConfig.merge(merged, res.value as Dictionary)
+			return _fail(GSError.CODE_PARSE, id, "%s must hold a mapping at the top level" % f["path"])
+		GSAddonConfig.merge(merged, res.value as Dictionary)
 		sources.append("%s: %s" % [f["tier"], f["path"]])
 	var chain := PackedStringArray([id])
 	var parent: Variant = merged.get(EXTENDS_KEY, "")
 	merged.erase(EXTENDS_KEY)
 	if not (parent is String):
-		return _fail(DotError.CODE_INVALID, id, "extends must be a profile id")
+		return _fail(GSError.CODE_INVALID, id, "extends must be a profile id")
 	if parent != "":
 		var trail := visiting + PackedStringArray([id])
 		if trail.has(parent):
-			return _fail(DotError.CODE_INVALID, id, "extends cycle: %s" % " -> ".join(trail + PackedStringArray([parent])))
+			return _fail(GSError.CODE_INVALID, id, "extends cycle: %s" % " -> ".join(trail + PackedStringArray([parent])))
 		var up := _raw(parent, trail)
 		if not up.ok:
 			return up.wrap("%s/%s extends %s" % [rel_path, id, parent])
 		var base: Dictionary = (up.value["data"] as Dictionary).duplicate(true)
-		DotAddonConfig.merge(base, merged)
+		GSAddonConfig.merge(base, merged)
 		merged = base
 		chain.append_array(up.value["chain"])
 		sources = up.value["sources"] + sources
-	return DotResult.success({"data": merged, "sources": sources, "chain": chain})
+	return GSResult.success({"data": merged, "sources": sources, "chain": chain})
 
 
 ## Dotted leaf paths of [param d] (dictionaries descended, arrays and scalars are leaves).
@@ -491,7 +491,7 @@ static func _flat_keys(d: Dictionary, prefix: String, out: PackedStringArray) ->
 			out.append(path)
 
 
-func _load(id: String) -> DotResult:
+func _load(id: String) -> GSResult:
 	var raw := _raw(id, PackedStringArray())
 	if not raw.ok:
 		return raw
@@ -527,26 +527,26 @@ func _load(id: String) -> DotResult:
 	for path in runtime.get(id, {}):
 		var parts: PackedStringArray = String(path).split(".")
 		if parts[0] == EXTRA_KEY and parts.size() > 1 and extra is Dictionary:
-			DotAddonConfig.set_nested(extra, parts.slice(1), runtime[id][path])
+			GSAddonConfig.set_nested(extra, parts.slice(1), runtime[id][path])
 		elif names.has(parts[0]):
 			if parts.size() == 1:
 				values[parts[0]] = runtime[id][path]
 			elif values[parts[0]] is Dictionary:
-				DotAddonConfig.set_nested(values[parts[0]], parts.slice(1), runtime[id][path])
+				GSAddonConfig.set_nested(values[parts[0]], parts.slice(1), runtime[id][path])
 			supplied[parts[0]] = true
 	for k in names:
 		var f: Dictionary = names[k]
 		if f.get("required", false) and not supplied[k]:
 			errors.append("%s: required" % k)
 			continue
-		var checked := DotAddonConfig.check_field(f, values[k])
+		var checked := GSAddonConfig.check_field(f, values[k])
 		if checked.has("error"):
 			errors.append("%s: %s" % [k, checked["error"]])
 		else:
 			values[k] = checked["value"]
 	if not errors.is_empty():
-		return _fail(DotError.CODE_INVALID, id, "; ".join(errors))
-	var p := DotProfile.new()
+		return _fail(GSError.CODE_INVALID, id, "; ".join(errors))
+	var p := GSProfile.new()
 	p.id = id
 	p.set_ref = self
 	p.values = values
@@ -562,8 +562,8 @@ func _load(id: String) -> DotResult:
 	_flat_keys(data, "", fk)
 	fk.sort()
 	p.file_keys = fk
-	DotLog.debug(CHANNEL, "loaded", {"kind": rel_path, "id": id, "files": p.sources.size(), "overrides": overrides.size()})
-	return DotResult.success(p)
+	GSLog.debug(CHANNEL, "loaded", {"kind": rel_path, "id": id, "files": p.sources.size(), "overrides": overrides.size()})
+	return GSResult.success(p)
 
 
 ## {value} when environment or command line set [param key], else null.
@@ -588,16 +588,16 @@ func _override(id: String, key: String, f: Dictionary, current: Variant, overrid
 			from = "cli " + cli
 	if raw == null:
 		return null
-	if DotAddonConfig._is_sensitive(key, sensitive):
+	if GSAddonConfig._is_sensitive(key, sensitive):
 		refused.append("%s (%s)" % [key, from])
-		DotLog.warn(CHANNEL, "secret refused from environment/argv", {"kind": rel_path, "id": id, "key": key})
+		GSLog.warn(CHANNEL, "secret refused from environment/argv", {"kind": rel_path, "id": id, "key": key})
 		return null
 	var proto: Variant = current
 	if proto == null:
 		proto = {"int": 0, "float": 0.0, "string": "", "bool": false, "list": []}.get(f["type"])
-	var coerced: Variant = DotAddonConfig._coerce(str(raw), proto)
+	var coerced: Variant = GSAddonConfig._coerce(str(raw), proto)
 	if coerced == null:
-		DotLog.warn(CHANNEL, "override has the wrong type", {"kind": rel_path, "id": id, "key": key, "from": from})
+		GSLog.warn(CHANNEL, "override has the wrong type", {"kind": rel_path, "id": id, "key": key, "from": from})
 		return null
 	overrides.append("%s <- %s" % [key, from])
 	return {"value": coerced}

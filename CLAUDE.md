@@ -1,8 +1,8 @@
 # GameSpice Profile
 
-`DotProfileSet`, `DotProfile` and `DotProfileRuntime`: per-entity yml profiles, split out of dot-core at its API level 22. Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is specific here.
+`GSProfileSet`, `GSProfile` and `GSProfileRuntime`: per-entity yml profiles, split out of dot-core at its API level 22. Read the family [CLAUDE.md](../../CLAUDE.md) first; this file is only what is specific here.
 
-**Only GameSpice Core is a dependency** (>= 21), linked in `.gitignore` for the suites. GameSpice Core must never name these classes; what both need (`DotAddonConfig.merge`, `set_nested`, `is_finite_value`, `check_field`, `DotYaml.emit`, the user-tier flag) lives in GameSpice Core.
+**Only GameSpice Core is a dependency** (>= 21), linked in `.gitignore` for the suites. GameSpice Core must never name these classes; what both need (`GSAddonConfig.merge`, `set_nested`, `is_finite_value`, `check_field`, `GSYaml.emit`, the user-tier flag) lives in GameSpice Core.
 
 ## Read before
 
@@ -21,4 +21,4 @@
 | `addons/dot_profile/tools/profile_check.gd` | headless validator (no `class_name`): `-- <repo> [--schema script] [--skip-unknown]`; dot-ci `profiles: true` |
 | `examples/` | `profile_selftest`, `profile_runtime_selftest`, `profile_check_selftest`, `user_tier_selftest` |
 
-`DotProfileSet.user_tier_enabled` reads `DotAddonConfig.user_tier_enabled`; there is one flag.
+`GSProfileSet.user_tier_enabled` reads `GSAddonConfig.user_tier_enabled`; there is one flag.

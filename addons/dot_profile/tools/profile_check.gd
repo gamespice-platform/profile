@@ -2,7 +2,7 @@ extends SceneTree
 
 ## Checks every profile yml under a repository's cfg/ against its schema, with no game running, and exits 1 on any error.
 ## Run: godot --headless --path . --script addons/dot_profile/tools/profile_check.gd -- <dir>... [--schema <script>]... [--skip-unknown]
-## Loads every profile through [DotProfileSet] (the game's own verdict); schemas come from global classes with [code]static func profile_schemas()[/code] or [code]--schema[/code]; no [code]class_name[/code].
+## Loads every profile through [GSProfileSet] (the game's own verdict); schemas come from global classes with [code]static func profile_schemas()[/code] or [code]--schema[/code]; no [code]class_name[/code].
 
 var _providers: Dictionary = {}
 var _seen_scripts := {}
@@ -12,7 +12,7 @@ var _files := 0
 
 
 func _initialize() -> void:
-	DotLog.set_level(DotLog.Level.FATAL)
+	GSLog.set_level(GSLog.Level.FATAL)
 	var dirs := PackedStringArray()
 	var args := OS.get_cmdline_user_args()
 	var explicit := PackedStringArray()
@@ -146,7 +146,7 @@ func _check_tier(cfg: String, tier: String, owner_name: String, dir: String) -> 
 
 func _check_tier_kind(cfg: String, tier: String, owner_name: String, dir: String, kind: String) -> void:
 	if not _providers.has(kind):
-		# A folder named after an addon the project links is that addon's own config (DotAddonConfig), not a profile kind.
+		# A folder named after an addon the project links is that addon's own config (GSAddonConfig), not a profile kind.
 		if DirAccess.dir_exists_absolute(cfg.get_base_dir().path_join("addons").path_join(kind)):
 			return
 		if not _skip_unknown:
@@ -163,20 +163,20 @@ func _check_dir(ctx: Dictionary, dir: String, rel: String, schema: Array, childr
 		var ext := f.get_extension().to_lower()
 		if ext == "yaml":
 			_error(dir.path_join(f), "a .yaml file is never read; rename it to .yml")
-		elif ext == DotProfileSet.EXTENSION:
+		elif ext == GSProfileSet.EXTENSION:
 			_add_id(ids, folded, dir, f.get_basename(), dir.path_join(f))
 	for sub in DirAccess.get_directories_at(dir):
 		var own := ""
-		for n in [sub, DotProfileSet.FOLDER_FILE]:
-			var p := dir.path_join(sub).path_join(n + "." + DotProfileSet.EXTENSION)
+		for n in [sub, GSProfileSet.FOLDER_FILE]:
+			var p := dir.path_join(sub).path_join(n + "." + GSProfileSet.EXTENSION)
 			if FileAccess.file_exists(p):
 				if own != "":
-					_error(p, "folder profile '%s' has both %s.yml and %s.yml" % [sub, sub, DotProfileSet.FOLDER_FILE])
+					_error(p, "folder profile '%s' has both %s.yml and %s.yml" % [sub, sub, GSProfileSet.FOLDER_FILE])
 				own = own if own != "" else p
 		if own != "":
 			_add_id(ids, folded, dir, sub, own)
 		else:
-			_error(dir.path_join(sub), "folder has no %s.yml or %s.yml" % [sub, DotProfileSet.FOLDER_FILE])
+			_error(dir.path_join(sub), "folder has no %s.yml or %s.yml" % [sub, GSProfileSet.FOLDER_FILE])
 	var ids_sorted := ids.keys()
 	ids_sorted.sort()
 	for id in ids_sorted:
@@ -215,7 +215,7 @@ func _check_profile(ctx: Dictionary, _dir: String, rel: String, schema: Array, i
 	var so: String = ctx.get("server_owner", "")
 	var addon: String = ctx["owner"] if (tier == "addon" or so == "addons") else _first_dir(ctx["cfg"], ["addon", "addons"], rel)
 	var game: String = ctx["owner"] if (tier == "game" or so == "game") else ("" if tier == "addon" else _first_dir(ctx["cfg"], ["game", "games"], rel))
-	var s := DotProfileSet.create(addon, game, rel, schema)
+	var s := GSProfileSet.create(addon, game, rel, schema)
 	s.roots = PackedStringArray([ctx["cfg"]])
 	s.cmdline = PackedStringArray(["--"])
 	s.override_prefix = "profile_check_unused"

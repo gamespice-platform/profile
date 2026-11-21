@@ -1,8 +1,8 @@
-class_name DotProfileRuntime
+class_name GSProfileRuntime
 extends RefCounted
 
 ## Live editing of profiles: a permission-gated, validated runtime layer that replicates. See docs/profiles.md.
-## The server checks the actor, validates against the schema, writes the layer on [DotProfileSet], bumps the revision and
+## The server checks the actor, validates against the schema, writes the layer on [GSProfileSet], bumps the revision and
 ## hands the row to [member broadcast]; a client feeds rows to [method apply_row], which takes only newer revisions.
 
 const CHANNEL := "profile"
@@ -20,9 +20,9 @@ signal profile_changed(kind: String, id: String, revision: int)
 
 ## `(actor, flag: String) -> bool`. Unset means everything is denied.
 var permit: Callable = Callable()
-## Flag needed to edit or reset; GameSpice Server's `DotAdminFlags.CVAR`.
+## Flag needed to edit or reset; GameSpice Server's `GSAdminFlags.CVAR`.
 var edit_flag := "cvar"
-## Flag needed to write cfg/server; GameSpice Server's `DotAdminFlags.ROOT`.
+## Flag needed to write cfg/server; GameSpice Server's `GSAdminFlags.ROOT`.
 var save_flag := "root"
 ## `(row: Dictionary) -> void`: send to every client.
 var broadcast: Callable = Callable()
@@ -38,7 +38,7 @@ var _rev: Dictionary = {}
 
 
 ## Registers [param set] under its kind (its `rel_path`).
-func add_set(set: DotProfileSet) -> void:
+func add_set(set: GSProfileSet) -> void:
 	_sets[set.rel_path] = set
 
 
@@ -54,23 +54,23 @@ static func make_request(op: String, kind: String, id: String, key: String = "",
 
 
 ## Server side. Value on success: the changed row, or `{"saved": path}` for save.
-func handle_request(actor: Variant, req: Dictionary) -> DotResult:
+func handle_request(actor: Variant, req: Dictionary) -> GSResult:
 	var op: String = str(req.get("op", ""))
 	var kind: String = str(req.get("kind", ""))
 	var id: String = str(req.get("id", ""))
 	var flag := save_flag if op == OP_SAVE else edit_flag
 	if not permit.is_valid() or not bool(permit.call(actor, flag)):
-		DotLog.warn(CHANNEL, "profile edit denied", {"who": _who(actor), "op": op, "kind": kind, "id": id})
-		return DotResult.fail(DotError.CODE_FORBIDDEN, "profile edits need '%s'" % flag)
+		GSLog.warn(CHANNEL, "profile edit denied", {"who": _who(actor), "op": op, "kind": kind, "id": id})
+		return GSResult.fail(GSError.CODE_FORBIDDEN, "profile edits need '%s'" % flag)
 	if not [OP_SET, OP_RESET_KEY, OP_RESET, OP_SAVE, OP_ADD, OP_DELETE].has(op):
-		return DotResult.fail(DotError.CODE_INVALID, "unknown profile op '%s'" % op)
+		return GSResult.fail(GSError.CODE_INVALID, "unknown profile op '%s'" % op)
 	if not _sets.has(kind):
-		return DotResult.fail(DotError.CODE_INVALID, "unknown profile kind '%s'" % kind)
-	var set: DotProfileSet = _sets[kind]
+		return GSResult.fail(GSError.CODE_INVALID, "unknown profile kind '%s'" % kind)
+	var set: GSProfileSet = _sets[kind]
 	if op == OP_ADD:
 		return _add(actor, set, id, req.get("value"))
 	if not set.has_id(id):
-		return DotResult.fail(DotError.CODE_INVALID, "%s/%s: no such profile" % [kind, id])
+		return GSResult.fail(GSError.CODE_INVALID, "%s/%s: no such profile" % [kind, id])
 	match op:
 		OP_SET:
 			return _do_set(actor, set, id, str(req.get("key", "")), req.get("value"))
@@ -85,22 +85,22 @@ func handle_request(actor: Variant, req: Dictionary) -> DotResult:
 
 
 ## Client side: applies a server row if it is newer. Value: true when applied, false when stale.
-func apply_row(row: Dictionary) -> DotResult:
+func apply_row(row: Dictionary) -> GSResult:
 	var kind: String = str(row.get("kind", ""))
 	var id: String = str(row.get("id", ""))
 	var rev: Variant = row.get("rev")
 	var paths: Variant = row.get("paths")
 	if not _sets.has(kind) or not (rev is int or rev is float) or not (paths is Dictionary):
-		return DotResult.fail(DotError.CODE_INVALID, "malformed profile row")
+		return GSResult.fail(GSError.CODE_INVALID, "malformed profile row")
 	if int(rev) <= revision(kind, id):
-		return DotResult.success(false)
-	var set: DotProfileSet = _sets[kind]
+		return GSResult.success(false)
+	var set: GSProfileSet = _sets[kind]
 	if bool(row.get("removed", false)):
 		if set.has_id(id):
 			var _gone := set.remove_id(id)
 		_rev[_key(kind, id)] = int(rev)
 		profile_changed.emit(kind, id, int(rev))
-		return DotResult.success(true)
+		return GSResult.success(true)
 	if not set.has_id(id):
 		var _made := set.add_id(id)
 	var before := set.runtime_paths(id)
@@ -111,13 +111,13 @@ func apply_row(row: Dictionary) -> DotResult:
 		return loaded.wrap("profile row %s/%s" % [kind, id])
 	_rev[_key(kind, id)] = int(rev)
 	profile_changed.emit(kind, id, int(rev))
-	return DotResult.success(true)
+	return GSResult.success(true)
 
 
 ## Client side: forget every runtime row and revision, before a (re)connect's snapshot.
 func begin_sync() -> void:
 	for kind in _sets:
-		var set: DotProfileSet = _sets[kind]
+		var set: GSProfileSet = _sets[kind]
 		for id in set.runtime.keys():
 			set.set_runtime(id, {})
 			profile_changed.emit(kind, id, 0)
@@ -147,11 +147,11 @@ func describe() -> String:
 
 
 func describe_lines() -> PackedStringArray:
-	var out := PackedStringArray(["DotProfileRuntime (%d kinds, %d edited profiles)" % [_sets.size(), _rev.size()]])
+	var out := PackedStringArray(["GSProfileRuntime (%d kinds, %d edited profiles)" % [_sets.size(), _rev.size()]])
 	for k in _rev:
 		var kind: String = k.get_slice("/", 0)
 		var id: String = k.substr(kind.length() + 1)
-		out.append("  %s rev %d: %s" % [k, _rev[k], str((_sets[kind] as DotProfileSet).runtime_paths(id))])
+		out.append("  %s rev %d: %s" % [k, _rev[k], str((_sets[kind] as GSProfileSet).runtime_paths(id))])
 	return out
 
 
@@ -166,18 +166,18 @@ func _who(actor: Variant) -> String:
 
 
 func _row(kind: String, id: String) -> Dictionary:
-	var set: DotProfileSet = _sets[kind]
+	var set: GSProfileSet = _sets[kind]
 	var row := {"kind": kind, "id": id, "rev": revision(kind, id), "paths": set.runtime_paths(id)}
 	if set.removed_ids.has(id):
 		row["removed"] = true
 	return row
 
 
-func _add(actor: Variant, set: DotProfileSet, id: String, start: Variant) -> DotResult:
+func _add(actor: Variant, set: GSProfileSet, id: String, start: Variant) -> GSResult:
 	var paths := {}
 	if start is Dictionary:
 		paths = (start as Dictionary).duplicate(true)
-	var mark := _server_file(set, id).get_basename() + "." + DotProfileSet.TOMBSTONE
+	var mark := _server_file(set, id).get_basename() + "." + GSProfileSet.TOMBSTONE
 	if FileAccess.file_exists(mark) and not set.has_id(id) and set._id_ok(id):
 		var _lifted := DirAccess.remove_absolute(mark)
 	var made := set.add_id(id)
@@ -198,7 +198,7 @@ func _add(actor: Variant, set: DotProfileSet, id: String, start: Variant) -> Dot
 	return _announce(actor, set, id, "add")
 
 
-func _delete(actor: Variant, set: DotProfileSet, id: String) -> DotResult:
+func _delete(actor: Variant, set: GSProfileSet, id: String) -> GSResult:
 	var kind := set.rel_path
 	var file := _server_file(set, id)
 	var shipped := false
@@ -208,51 +208,51 @@ func _delete(actor: Variant, set: DotProfileSet, id: String) -> DotResult:
 	if FileAccess.file_exists(file):
 		var err := DirAccess.remove_absolute(file)
 		if err != OK:
-			return DotResult.fail(DotError.CODE_IO, "cannot remove %s" % file)
+			return GSResult.fail(GSError.CODE_IO, "cannot remove %s" % file)
 	var gone := set.remove_id(id)
 	if not gone.ok:
 		return gone
-	var mark := file.get_basename() + "." + DotProfileSet.TOMBSTONE
+	var mark := file.get_basename() + "." + GSProfileSet.TOMBSTONE
 	if shipped:
-		var dir := DotPaths.ensure_parent_dir(mark)
+		var dir := GSPaths.ensure_parent_dir(mark)
 		if not dir.ok:
 			return dir
-		var wrote := DotPaths.write_text(mark, "deleted\n")
+		var wrote := GSPaths.write_text(mark, "deleted\n")
 		if not wrote.ok:
 			return wrote.wrap("marking %s deleted" % id)
-	DotWeb.sync_filesystem()
+	GSWeb.sync_filesystem()
 	return _announce(actor, set, id, "delete")
 
 
-func _announce(actor: Variant, set: DotProfileSet, id: String, what: String) -> DotResult:
+func _announce(actor: Variant, set: GSProfileSet, id: String, what: String) -> GSResult:
 	var kind := set.rel_path
 	var rev := revision(kind, id) + 1
 	_rev[_key(kind, id)] = rev
-	DotLog.info(CHANNEL, "profile %s" % what, {"who": _who(actor), "op": what, "kind": kind, "id": id, "rev": rev})
+	GSLog.info(CHANNEL, "profile %s" % what, {"who": _who(actor), "op": what, "kind": kind, "id": id, "rev": rev})
 	var row := _row(kind, id)
 	if broadcast.is_valid():
 		broadcast.call(row)
 	profile_changed.emit(kind, id, rev)
-	return DotResult.success(row)
+	return GSResult.success(row)
 
 
 ## The server-tier file [constant OP_SAVE] writes for [param id].
-func _server_file(set: DotProfileSet, id: String) -> String:
+func _server_file(set: GSProfileSet, id: String) -> String:
 	var base := save_root.path_join("server")
 	if set.game != "":
 		base = base.path_join("game").path_join(set.game)
 	elif set.addon_name != "":
 		base = base.path_join("addon").path_join(set.addon_name)
-	return base.path_join(set.rel_path).path_join(id + "." + DotProfileSet.EXTENSION)
+	return base.path_join(set.rel_path).path_join(id + "." + GSProfileSet.EXTENSION)
 
 
-func _effective(set: DotProfileSet, id: String, path: String) -> Variant:
+func _effective(set: GSProfileSet, id: String, path: String) -> Variant:
 	var res := set.load_profile(id)
 	if not res.ok:
 		return null
 	var parts := path.split(".")
-	var node: Variant = (res.value as DotProfile).extra if parts[0] == DotProfileSet.EXTRA_KEY else (res.value as DotProfile).values
-	if parts[0] == DotProfileSet.EXTRA_KEY:
+	var node: Variant = (res.value as GSProfile).extra if parts[0] == GSProfileSet.EXTRA_KEY else (res.value as GSProfile).values
+	if parts[0] == GSProfileSet.EXTRA_KEY:
 		parts = parts.slice(1)
 	for p in parts:
 		if not (node is Dictionary) or not (node as Dictionary).has(p):
@@ -261,29 +261,29 @@ func _effective(set: DotProfileSet, id: String, path: String) -> Variant:
 	return node
 
 
-func _do_set(actor: Variant, set: DotProfileSet, id: String, path: String, value: Variant) -> DotResult:
+func _do_set(actor: Variant, set: GSProfileSet, id: String, path: String, value: Variant) -> GSResult:
 	var checked := set.check_edit(id, path, value)
 	if not checked.ok:
-		DotLog.warn(CHANNEL, "profile edit refused", {"who": _who(actor), "kind": set.rel_path, "id": id, "key": path, "why": checked.error.message})
+		GSLog.warn(CHANNEL, "profile edit refused", {"who": _who(actor), "kind": set.rel_path, "id": id, "key": path, "why": checked.error.message})
 		return checked
 	var paths := set.runtime_paths(id)
 	paths[path] = checked.value["value"]
 	return _commit(actor, set, id, paths, "set", path, checked.value["value"])
 
 
-func _reset_key(actor: Variant, set: DotProfileSet, id: String, path: String) -> DotResult:
+func _reset_key(actor: Variant, set: GSProfileSet, id: String, path: String) -> GSResult:
 	var paths := set.runtime_paths(id)
 	if not paths.has(path):
-		return DotResult.success({"changed": false})
+		return GSResult.success({"changed": false})
 	paths.erase(path)
 	return _commit(actor, set, id, paths, "reset_key", path, null)
 
 
 ## Applies [param paths] as the layer, rolling back if the profile no longer loads.
-func _commit(actor: Variant, set: DotProfileSet, id: String, paths: Dictionary, what: String, path: String, value: Variant) -> DotResult:
+func _commit(actor: Variant, set: GSProfileSet, id: String, paths: Dictionary, what: String, path: String, value: Variant) -> GSResult:
 	var before := set.runtime_paths(id)
-	if DotValue.same_dictionary(before, paths):
-		return DotResult.success({"changed": false})
+	if GSValue.same_dictionary(before, paths):
+		return GSResult.success({"changed": false})
 	var old: Variant = _effective(set, id, path) if path != "" else null
 	set.set_runtime(id, paths)
 	var loaded := set.load_profile(id)
@@ -294,40 +294,40 @@ func _commit(actor: Variant, set: DotProfileSet, id: String, paths: Dictionary, 
 	var rev := revision(kind, id) + 1
 	_rev[_key(kind, id)] = rev
 	var now: Variant = _effective(set, id, path) if path != "" else null
-	DotLog.info(CHANNEL, "profile edited", {"who": _who(actor), "op": what, "kind": kind, "id": id, "key": path, "old": str(old), "new": str(now), "rev": rev})
+	GSLog.info(CHANNEL, "profile edited", {"who": _who(actor), "op": what, "kind": kind, "id": id, "key": path, "old": str(old), "new": str(now), "rev": rev})
 	var row := _row(kind, id)
 	if broadcast.is_valid():
 		broadcast.call(row)
 	profile_changed.emit(kind, id, rev)
-	return DotResult.success(row)
+	return GSResult.success(row)
 
 
-func _save(actor: Variant, set: DotProfileSet, id: String) -> DotResult:
+func _save(actor: Variant, set: GSProfileSet, id: String) -> GSResult:
 	var paths := set.runtime_paths(id)
 	if paths.is_empty() and not set.added_ids.has(id):
-		return DotResult.fail(DotError.CODE_STATE, "%s/%s has no runtime edits to save" % [set.rel_path, id])
+		return GSResult.fail(GSError.CODE_STATE, "%s/%s has no runtime edits to save" % [set.rel_path, id])
 	for part in [set.game, set.addon_name]:
 		if part != "" and not set._id_ok(part):
-			push_error("DotProfileRuntime: bad game or addon name '%s'" % part)
-			return DotResult.fail(DotError.CODE_INVALID, "bad game or addon name '%s'" % part)
+			push_error("GSProfileRuntime: bad game or addon name '%s'" % part)
+			return GSResult.fail(GSError.CODE_INVALID, "bad game or addon name '%s'" % part)
 	var file := _server_file(set, id)
 	var tree := {}
 	if FileAccess.file_exists(file):
-		var existing := DotYaml.parse_file(file)
+		var existing := GSYaml.parse_file(file)
 		if not existing.ok:
 			return existing.wrap("saving %s" % file)
 		if existing.value is Dictionary:
 			tree = existing.value
 	for path in paths:
-		DotAddonConfig.set_nested(tree, String(path).split("."), paths[path])
-	var text: Variant = DotYaml.emit(tree)
+		GSAddonConfig.set_nested(tree, String(path).split("."), paths[path])
+	var text: Variant = GSYaml.emit(tree)
 	if text == null:
-		return DotResult.fail(DotError.CODE_INVALID, "%s/%s holds a value yml cannot carry" % [set.rel_path, id])
-	var dir := DotPaths.ensure_parent_dir(file)
+		return GSResult.fail(GSError.CODE_INVALID, "%s/%s holds a value yml cannot carry" % [set.rel_path, id])
+	var dir := GSPaths.ensure_parent_dir(file)
 	if not dir.ok:
 		return dir
-	var wrote := DotPaths.write_text(file, text)
+	var wrote := GSPaths.write_text(file, text)
 	if not wrote.ok:
 		return wrote.wrap("saving %s" % file)
-	DotLog.info(CHANNEL, "profile saved to server layer", {"who": _who(actor), "kind": set.rel_path, "id": id, "file": file, "keys": paths.size()})
-	return DotResult.success({"saved": file})
+	GSLog.info(CHANNEL, "profile saved to server layer", {"who": _who(actor), "kind": set.rel_path, "id": id, "file": file, "keys": paths.size()})
+	return GSResult.success({"saved": file})

@@ -1,4 +1,4 @@
-class_name DotBoxProfiles
+class_name GSBoxProfiles
 extends RefCounted
 
 ## The `box` profile kind: a random box type (looks, odds, outcomes, timed effect, sounds) as one yml per type.
@@ -11,7 +11,7 @@ const POLARITIES: Array[String] = ["positive", "negative", "mixed"]
 const IMPACTS: Array[String] = ["self", "radius", "everyone", "game"]
 const DURATION_MODES: Array[String] = ["instant", "seconds", "round"]
 const DROP_SOURCES: Array[String] = ["common", "special", "brute", "map"]
-## Sound events; the same list as GameSpice Audio's DotBoxSounds.EVENTS (GameSpice Profile must not depend on GameSpice Audio).
+## Sound events; the same list as GameSpice Audio's GSBoxSounds.EVENTS (GameSpice Profile must not depend on GameSpice Audio).
 const LIST_KEY := "_list"
 const SOUND_EVENTS: Array[String] = ["spawn", "approach", "open", "reward", "deny", "effect_end"]
 const SOUND_MODES: Array[String] = ["3d", "ui"]
@@ -19,7 +19,7 @@ const SOUND_KEYS: Array[String] = ["sound", "volume", "pitch_jitter", "max_dista
 
 
 static func schema() -> Array:
-	var f := DotProfileSet.field
+	var f := GSProfileSet.field
 	return [
 		f.call("title", "string", ""),
 		f.call("colour", "string", "#d0a040"),
@@ -44,18 +44,18 @@ static func schema() -> Array:
 
 
 static func profile_schemas() -> Dictionary:
-	return {KIND: {"schema": schema(), "children": {}, "validator": Callable(DotBoxProfiles, "check")}}
+	return {KIND: {"schema": schema(), "children": {}, "validator": Callable(GSBoxProfiles, "check")}}
 
 
-static func make_set(game: String, roots: PackedStringArray = PackedStringArray()) -> DotProfileSet:
-	var s := DotProfileSet.create(ADDON, game, KIND, schema())
+static func make_set(game: String, roots: PackedStringArray = PackedStringArray()) -> GSProfileSet:
+	var s := GSProfileSet.create(ADDON, game, KIND, schema())
 	s.roots = roots
-	s.validator = Callable(DotBoxProfiles, "check")
+	s.validator = Callable(GSBoxProfiles, "check")
 	return s
 
 
 ## Checks the dict-valued keys the schema cannot: duration, drop odds, sound slots. Returns every problem as one CODE_INVALID.
-static func check(p: DotProfile) -> DotResult:
+static func check(p: GSProfile) -> GSResult:
 	var problems: Array[String] = []
 	var d: Dictionary = p.get_value("duration", {})
 	var mode := str(d.get("mode", "instant"))
@@ -84,8 +84,8 @@ static func check(p: DotProfile) -> DotResult:
 			continue
 		problems.append_array(check_slot(str(ev), slot))
 	if problems.is_empty():
-		return DotResult.success(p)
-	return DotResult.fail(DotError.CODE_INVALID, "box profile '%s' is invalid" % p.id, "; ".join(problems))
+		return GSResult.success(p)
+	return GSResult.fail(GSError.CODE_INVALID, "box profile '%s' is invalid" % p.id, "; ".join(problems))
 
 
 static func check_slot(event: String, slot: Dictionary) -> Array[String]:
@@ -109,15 +109,15 @@ static func check_slot(event: String, slot: Dictionary) -> Array[String]:
 	return out
 
 
-## One box profile loaded (the set's validator is [method check]); the value is a [DotProfile].
-static func load_box(set: DotProfileSet, id: String) -> DotResult:
+## One box profile loaded (the set's validator is [method check]); the value is a [GSProfile].
+static func load_box(set: GSProfileSet, id: String) -> GSResult:
 	var res := set.load_profile(id)
 	if not res.ok:
 		return res
 	return res
 
 
-## yml text for a box document `{key: value}` with nested maps and lists of maps (DotYaml.emit does scalars-only lists); the reader gives the same tree back.
+## yml text for a box document `{key: value}` with nested maps and lists of maps (GSYaml.emit does scalars-only lists); the reader gives the same tree back.
 static func to_yaml(tree: Dictionary, indent: int = 0) -> String:
 	var out := PackedStringArray()
 	var pad := "  ".repeat(indent)
@@ -134,7 +134,7 @@ static func to_yaml(tree: Dictionary, indent: int = 0) -> String:
 			else:
 				out.append("%s%s:" % [pad, k])
 				for raw_item: Variant in v:
-					# DotYaml has no list in a list: one is written as `- _list: [...]` and [method unwrap_lists] undoes it.
+					# GSYaml has no list in a list: one is written as `- _list: [...]` and [method unwrap_lists] undoes it.
 					var item: Variant = {LIST_KEY: raw_item} if raw_item is Array else raw_item
 					if item is Dictionary:
 						var lines := to_yaml(item, indent + 2).trim_suffix("\n").split("\n")

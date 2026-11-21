@@ -1,6 +1,6 @@
 extends Node
 
-## Exercises [DotProfileSet] and [DotProfile]: schema, extends, tiers, overrides, folders.
+## Exercises [GSProfileSet] and [GSProfile]: schema, extends, tiers, overrides, folders.
 ## Run: godot --headless --path . res://examples/profile_selftest.tscn
 
 const SECTIONS := 12
@@ -13,7 +13,7 @@ var _section_count := 0
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.FATAL)
+	GSLog.set_level(GSLog.Level.FATAL)
 	_run()
 
 
@@ -45,18 +45,18 @@ func _run() -> void:
 
 func _schema() -> Array:
 	return [
-		DotProfileSet.field("name", "string", "unnamed"),
-		DotProfileSet.field("health", "int", 100, {"min": 1, "max": 1000}),
-		DotProfileSet.field("speed", "float", 3.0, {"min": 0.0}),
-		DotProfileSet.field("mode", "string", "melee", {"enum": ["melee", "ranged"]}),
-		DotProfileSet.field("boss", "bool", false),
-		DotProfileSet.field("loot", "list", []),
-		DotProfileSet.field("stats", "dict", {}),
+		GSProfileSet.field("name", "string", "unnamed"),
+		GSProfileSet.field("health", "int", 100, {"min": 1, "max": 1000}),
+		GSProfileSet.field("speed", "float", 3.0, {"min": 0.0}),
+		GSProfileSet.field("mode", "string", "melee", {"enum": ["melee", "ranged"]}),
+		GSProfileSet.field("boss", "bool", false),
+		GSProfileSet.field("loot", "list", []),
+		GSProfileSet.field("stats", "dict", {}),
 	]
 
 
-func _mk(kind: String = "npc", schema: Array = []) -> DotProfileSet:
-	var s := DotProfileSet.create("dot-npc", "mygame", kind, schema if not schema.is_empty() else _schema())
+func _mk(kind: String = "npc", schema: Array = []) -> GSProfileSet:
+	var s := GSProfileSet.create("dot-npc", "mygame", kind, schema if not schema.is_empty() else _schema())
 	s.roots = PackedStringArray([BASE])
 	s.override_prefix = "pst"
 	return s
@@ -104,7 +104,7 @@ func _test_schema() -> void:
 	_check(r.value.get_value("mode") == "melee", "a default fills a missing key")
 	_check(r.value.get_value("speed") is float and r.value.get_value("speed") == 2.0, "an int in a float field is a float")
 	r = s.load_profile("high")
-	_check(not r.ok and r.error.code == DotError.CODE_INVALID, "above max is CODE_INVALID")
+	_check(not r.ok and r.error.code == GSError.CODE_INVALID, "above max is CODE_INVALID")
 	_check(r.error.message.contains("health") and r.error.message.contains("max"), "the message names key and bound")
 	_check(not s.load_profile("enum").ok, "a value outside the enum fails")
 	r = s.load_profile("type")
@@ -113,9 +113,9 @@ func _test_schema() -> void:
 	_check(not r.ok and r.error.message.contains("helth"), "an unknown top-level key fails when strict")
 	s.strict = false
 	_check(s.load_profile("typo").ok, "and passes when not strict")
-	var req := _mk("npc", [DotProfileSet.field("id_tag", "string", null, {"required": true})])
+	var req := _mk("npc", [GSProfileSet.field("id_tag", "string", null, {"required": true})])
 	_check(not req.load_profile("ok").ok, "a required key that is absent fails")
-	_check(s.load_profile("nope").error.code == DotError.CODE_INVALID, "a missing profile is an error result")
+	_check(s.load_profile("nope").error.code == GSError.CODE_INVALID, "a missing profile is an error result")
 	_check(not s.load_profile("../x").ok, "a path in the id is refused")
 
 
@@ -158,7 +158,7 @@ func _test_merge() -> void:
 	_check(b.value.get_value("stats") == {"str": 5, "dex": 3}, "the parent is not mutated")
 	_check(list_eq(r.value.file_keys, ["extra.ai.hear", "extra.ai.sight", "loot", "stats.dex", "stats.str"]), "file_keys lists file-set leaf paths, through extends")
 	_addon("npc/lone.yml", "health: 50\n")
-	var lone: DotProfile = _mk().load_profile("lone").value
+	var lone: GSProfile = _mk().load_profile("lone").value
 	_check(list_eq(lone.file_keys, ["health"]) and lone.describe().contains("file keys set: health"), "a schema default is not a file key")
 
 
@@ -202,34 +202,34 @@ func _test_tiers() -> void:
 	bad.game = "a/b"
 	bad.clear_cache()
 	_check(bad.load_profile("orc").value.get_value("health") != 888, "a game name with / is skipped")
-	_check(_mk("npc").game == "mygame" and DotProfileSet.create("dot-npc", "", "npc").has_id("orc") == false, "no game id skips the game tier")
+	_check(_mk("npc").game == "mygame" and GSProfileSet.create("dot-npc", "", "npc").has_id("orc") == false, "no game id skips the game tier")
 
 
 func _test_former_game() -> void:
 	_section("A renamed game's former id is read under its own")
 	_clean()
-	DotAddonConfig.register_former_game("mygame", PackedStringArray(["oldgame"]))
+	GSAddonConfig.register_former_game("mygame", PackedStringArray(["oldgame"]))
 	_w("game/oldgame/npc/orc.yml", "health: 120\nname: OldOrc\n")
 	_check(_mk().load_profile("orc").value.get_value("health") == 120, "cfg/game/<former>/ still loads")
 	_gamef("npc/orc.yml", "health: 130\n")
-	var r: DotProfile = _mk().load_profile("orc").value
+	var r: GSProfile = _mk().load_profile("orc").value
 	_check(r.get_value("health") == 130 and r.get_value("name") == "OldOrc", "the new id wins; the former merges under it")
 	_w("server/game/oldgame/npc/orc.yml", "health: 140\n")
 	_check(_mk().load_profile("orc").value.get_value("health") == 140, "cfg/server/game/<former>/ is the operator tier")
-	DotAddonConfig.former_games.erase("mygame")
+	GSAddonConfig.former_games.erase("mygame")
 
 
 func _test_plural_legacy() -> void:
 	_section("Singular dirs are canonical; addons/, games/, server/addons/, server/games/ are read with one WARN")
 	_clean()
-	DotCfgLegacy.reset()
+	GSCfgLegacy.reset()
 	_addon("npc/orc.yml", "health: 100\n")
-	_check(_mk().load_profile("orc").value.get_value("health") == 100 and DotCfgLegacy.warned_count() == 0, "a singular addon file is read with no warning")
+	_check(_mk().load_profile("orc").value.get_value("health") == 100 and GSCfgLegacy.warned_count() == 0, "a singular addon file is read with no warning")
 	_clean()
 	_w("addons/dot-npc/npc/orc.yml", "health: 120\nspeed: 9.0\n")
 	var r := _mk().load_profile("orc")
 	_check(r.ok and r.value.get_value("health") == 120 and r.value.get_value("speed") == 9.0, "cfg/addons/<addon>/ is still read")
-	_check(DotCfgLegacy.warned_count() == 1, "with one warning")
+	_check(GSCfgLegacy.warned_count() == 1, "with one warning")
 	_addon("npc/orc.yml", "health: 130\n")
 	r = _mk().load_profile("orc")
 	_check(r.value.get_value("health") == 130, "both present: the singular file wins")
@@ -240,16 +240,16 @@ func _test_plural_legacy() -> void:
 	_check(_mk().load_profile("orc").value.get_value("health") == 150, "cfg/server/addons/<addon>/ is still read")
 	_w("server/games/mygame/npc/orc.yml", "health: 160\n")
 	_check(_mk().load_profile("orc").value.get_value("health") == 160, "cfg/server/games/<game>/ is still read")
-	_check(DotCfgLegacy.warned_count() == 4, "one warning per old path")
+	_check(GSCfgLegacy.warned_count() == 4, "one warning per old path")
 	_clean()
-	DotCfgLegacy.reset()
+	GSCfgLegacy.reset()
 
 
 func _test_overrides() -> void:
 	_section("Environment and command line over files")
 	_clean()
 	_addon("npc/orc.yml", "health: 100\nboss: false\nname: Orc\napi_token: x\n")
-	var sc := [DotProfileSet.field("health", "int", 1, {"max": 500}), DotProfileSet.field("boss", "bool", false), DotProfileSet.field("name", "string", ""), DotProfileSet.field("api_token", "string", "")]
+	var sc := [GSProfileSet.field("health", "int", 1, {"max": 500}), GSProfileSet.field("boss", "bool", false), GSProfileSet.field("name", "string", ""), GSProfileSet.field("api_token", "string", "")]
 	var s := _mk("npc", sc)
 	OS.set_environment("PST_NPC_ORC_HEALTH", "300")
 	OS.set_environment("PST_NPC_ORC_BOSS", "true")
@@ -320,15 +320,15 @@ func _test_folders() -> void:
 	_addon("weapon/knife.yml", "name: Knife\n")
 	var s := _mk("weapon")
 	_check(list_eq(s.list_ids(), ["knife", "pistol", "rifle"]), "flat files and folders list together")
-	var p: DotProfile = s.load_profile("pistol").value
+	var p: GSProfile = s.load_profile("pistol").value
 	_check(p.get_value("name") == "Pistol", "<id>/<id>.yml loads")
 	_check(s.load_profile("rifle").value.get_value("name") == "Rifle", "<id>/profile.yml loads")
 	_check(list_eq(p.child_kinds(), ["upgrades"]), "child kinds come from sub-folders")
-	var up_schema := [DotProfileSet.field("name", "string", ""), DotProfileSet.field("speed", "float", 0.0)]
+	var up_schema := [GSProfileSet.field("name", "string", ""), GSProfileSet.field("speed", "float", 0.0)]
 	var up := p.child_set("upgrades", up_schema)
 	_check(list_eq(up.list_ids(), ["scope", "scope2"]), "children list lazily")
 	_check(up.load_profile("scope").value.get_value("speed") == 1.5, "a child merges tiers")
-	var s2: DotProfile = up.load_profile("scope2").value
+	var s2: GSProfile = up.load_profile("scope2").value
 	_check(s2.get_value("speed") == 2.0 and s2.get_value("name") == "Scope", "a child extends a sibling")
 	_check(s2.get_extra("zoom") == 4, "a child keeps its extra")
 	_check(not up.load_profile("scope").value.values.has("health"), "a child has its own schema")
@@ -340,7 +340,7 @@ func _test_no_cycle() -> void:
 	_clean()
 	_addon("npc/a.yml", "name: A\n")
 	var s := _mk()
-	var keep: DotProfile = s.load_profile("a").value
+	var keep: GSProfile = s.load_profile("a").value
 	_check(keep.set_ref == s, "a profile reaches its set while the set lives")
 	var set_w: WeakRef = weakref(s)
 	var prof_w: WeakRef = weakref(keep)
@@ -349,13 +349,13 @@ func _test_no_cycle() -> void:
 	_check(set_w.get_ref() == null, "the set is freed with no clear_cache() call")
 	_check(prof_w.get_ref() == null, "its cached profile is freed with it")
 	var s2 := _mk()
-	var orphan: DotProfile = s2.load_profile("a").value
+	var orphan: GSProfile = s2.load_profile("a").value
 	s2 = null
 	_check(orphan.set_ref == null and orphan.child_set("x") == null, "a profile outliving its set has a null set_ref")
 
 
 func _test_bad_yml() -> void:
-	_section("Bad yml is a DotResult error naming the file")
+	_section("Bad yml is a GSResult error naming the file")
 	_clean()
 	_addon("npc/bad.yml", "health: 5\n\tbroken: [\n")
 	_addon("npc/list.yml", "- a\n- b\n")
@@ -365,12 +365,12 @@ func _test_bad_yml() -> void:
 	_addon("npc/kid.yml", "extends: bad\n")
 	var s := _mk()
 	var r := s.load_profile("bad")
-	_check(not r.ok and r.error.code == DotError.CODE_PARSE, "a malformed file is CODE_PARSE")
+	_check(not r.ok and r.error.code == GSError.CODE_PARSE, "a malformed file is CODE_PARSE")
 	_check(r.error.message.contains("bad.yml"), "naming the file")
 	_check(s.load_profile("empty").ok, "an empty file is all defaults")
 	_check(not s.load_profile("ext").ok, "extends must be an id")
 	_check(not s.load_profile("kid").ok and s.load_profile("ok").ok, "a bad parent fails the child only")
-	_check(s.describe().contains("DotProfileSet") and s.load_profile("ok").value.describe().contains("DotProfile ok"), "describe works")
+	_check(s.describe().contains("GSProfileSet") and s.load_profile("ok").value.describe().contains("GSProfile ok"), "describe works")
 	_check(s.load_profile("ok").value.describe_lines().size() >= 2, "describe_lines lists values and sources")
 
 

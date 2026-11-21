@@ -1,4 +1,4 @@
-class_name DotProfile
+class_name GSProfile
 extends RefCounted
 
 ## One loaded profile: schema values, the `extra:` block, and where they came from.
@@ -23,9 +23,9 @@ var runtime_keys := PackedStringArray()
 var file_keys := PackedStringArray()
 ## The set that loaded this profile; held weakly, so the set's cache and its profiles do not
 ## keep each other alive. Null once the set is freed.
-var set_ref: DotProfileSet:
+var set_ref: GSProfileSet:
 	get:
-		return _set_weak.get_ref() as DotProfileSet if _set_weak != null else null
+		return _set_weak.get_ref() as GSProfileSet if _set_weak != null else null
 	set(value):
 		_set_weak = weakref(value) if value != null else null
 
@@ -39,7 +39,7 @@ func get_value(key: String, default: Variant = null) -> Variant:
 
 ## A dotted path into the `extra:` block.
 func get_extra(path: String, default: Variant = null) -> Variant:
-	return DotYaml.at(extra, path, default)
+	return GSYaml.at(extra, path, default)
 
 
 ## Values plus `extra` as one copy.
@@ -48,7 +48,7 @@ func to_dictionary() -> Dictionary:
 
 
 ## The set of sub-entities in this profile's folder, with their own schema; null once the owning set is freed.
-func child_set(child_kind: String, child_schema: Array = []) -> DotProfileSet:
+func child_set(child_kind: String, child_schema: Array = []) -> GSProfileSet:
 	var owner_set := set_ref
 	if owner_set == null:
 		return null
@@ -66,7 +66,7 @@ func describe() -> String:
 
 
 func describe_lines() -> PackedStringArray:
-	var out := PackedStringArray(["DotProfile %s (extends chain: %s)" % [id, " > ".join(chain)]])
+	var out := PackedStringArray(["GSProfile %s (extends chain: %s)" % [id, " > ".join(chain)]])
 	for k in values:
 		out.append("  %s = %s" % [k, str(values[k])])
 	for s in sources:

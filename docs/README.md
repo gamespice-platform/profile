@@ -2,4 +2,4 @@
 
 | File | What |
 | --- | --- |
-| [profiles.md](profiles.md) | `DotProfileSet`/`DotProfile`: per-entity yml profiles, tiers, extends, folders, the user tier, the validator, adopters |
+| [profiles.md](profiles.md) | `GSProfileSet`/`GSProfile`: per-entity yml profiles, tiers, extends, folders, the user tier, the validator, adopters |

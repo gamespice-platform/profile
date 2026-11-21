@@ -1,6 +1,6 @@
 extends Node
 
-## Exercises [DotProfileRuntime]: validated, permission-gated, replicated runtime profile edits.
+## Exercises [GSProfileRuntime]: validated, permission-gated, replicated runtime profile edits.
 ## Run: godot --headless --path . res://examples/profile_runtime_selftest.tscn
 
 const SECTIONS := 10
@@ -18,10 +18,10 @@ var _changes: Array = []
 
 
 func _ready() -> void:
-	DotLog.set_level(DotLog.Level.INFO)
-	DotLog.print_to_stdout = false
+	GSLog.set_level(GSLog.Level.INFO)
+	GSLog.print_to_stdout = false
 	_sink = _on_record
-	DotLog.add_sink(_sink)
+	GSLog.add_sink(_sink)
 	_run()
 
 
@@ -43,7 +43,7 @@ func _run() -> void:
 	_test_nested()
 	_test_add_delete()
 	_clean()
-	DotLog.remove_sink(_sink)
+	GSLog.remove_sink(_sink)
 
 	_line("")
 	_line("%d sections, %d passed, %d failed" % [_section_count, _passed, _failed])
@@ -56,13 +56,13 @@ func _run() -> void:
 
 func _schema() -> Array:
 	return [
-		DotProfileSet.field("health", "int", 100, {"min": 1, "max": 1000}),
-		DotProfileSet.field("speed", "float", 3.0, {"min": 0.0, "max": 50.0}),
-		DotProfileSet.field("mode", "string", "melee", {"enum": ["melee", "ranged"]}),
-		DotProfileSet.field("boss", "bool", false),
-		DotProfileSet.field("loot", "list", []),
-		DotProfileSet.field("stats", "dict", {}),
-		DotProfileSet.field("api_token", "string", ""),
+		GSProfileSet.field("health", "int", 100, {"min": 1, "max": 1000}),
+		GSProfileSet.field("speed", "float", 3.0, {"min": 0.0, "max": 50.0}),
+		GSProfileSet.field("mode", "string", "melee", {"enum": ["melee", "ranged"]}),
+		GSProfileSet.field("boss", "bool", false),
+		GSProfileSet.field("loot", "list", []),
+		GSProfileSet.field("stats", "dict", {}),
+		GSProfileSet.field("api_token", "string", ""),
 	]
 
 
@@ -73,13 +73,13 @@ func _world() -> Dictionary:
 	_w("addon/dot-npc/npc/ghoul.yml", "health: 20\n")
 	var server_set := _mk()
 	var client_set := _mk()
-	var server := DotProfileRuntime.new()
+	var server := GSProfileRuntime.new()
 	server.add_set(server_set)
 	server.save_root = BASE
 	server.permit = func(actor: Variant, flag: String) -> bool: return actor == "admin" or (actor == "mod" and flag == "cvar")
 	server.broadcast = func(row: Dictionary) -> void: _sent.append(row)
 	server.send_to = func(peer: Variant, row: Dictionary) -> void: _private.append([peer, row])
-	var client := DotProfileRuntime.new()
+	var client := GSProfileRuntime.new()
 	client.add_set(client_set)
 	_sent.clear()
 	_private.clear()
@@ -88,41 +88,41 @@ func _world() -> Dictionary:
 	return {"server": server, "client": client, "ss": server_set, "cs": client_set}
 
 
-func _mk() -> DotProfileSet:
-	var s := DotProfileSet.create("dot-npc", "mygame", "npc", _schema())
+func _mk() -> GSProfileSet:
+	var s := GSProfileSet.create("dot-npc", "mygame", "npc", _schema())
 	s.roots = PackedStringArray([BASE])
 	s.override_prefix = "prt"
 	return s
 
 
 func _req(op: String, id: String, key: String = "", value: Variant = null) -> Dictionary:
-	return DotProfileRuntime.make_request(op, "npc", id, key, value)
+	return GSProfileRuntime.make_request(op, "npc", id, key, value)
 
 
-func _val(set: DotProfileSet, id: String, key: String) -> Variant:
+func _val(set: GSProfileSet, id: String, key: String) -> Variant:
 	return set.load_profile(id).value.get_value(key)
 
 
 func _test_edit() -> void:
 	_section("a valid edit is applied, broadcast and signalled")
 	var w := _world()
-	var server: DotProfileRuntime = w["server"]
+	var server: GSProfileRuntime = w["server"]
 	var res := server.handle_request("admin", _req("set", "zombie", "health", 400))
 	_check(res.ok, "admin edit accepted")
 	_check(_val(w["ss"], "zombie", "health") == 400, "runtime value wins over the file's 50")
 	_check(_val(w["ss"], "ghoul", "health") == 20, "another profile is untouched")
 	_check(server.revision("npc", "zombie") == 1 and res.value["rev"] == 1, "revision is 1")
 	_check(_sent.size() == 1 and _sent[0]["paths"] == {"health": 400}, "the row was broadcast")
-	var res2: DotResult = server.handle_request("admin", _req("set", "zombie", "speed", 7))
+	var res2: GSResult = server.handle_request("admin", _req("set", "zombie", "speed", 7))
 	_check(res2.ok and _val(w["ss"], "zombie", "speed") == 7.0 and _val(w["ss"], "zombie", "speed") is float, "an int is coerced to a float field")
 	var seen: Array = []
 	server.profile_changed.connect(func(k: String, i: String, r: int) -> void: seen.append([k, i, r]))
 	server.handle_request("admin", _req("set", "zombie", "mode", "ranged"))
 	_check(seen == [["npc", "zombie", 3]], "profile_changed(kind, id, revision) fired")
-	var zp: DotProfile = w["ss"].load_profile("zombie").value
+	var zp: GSProfile = w["ss"].load_profile("zombie").value
 	_check(zp.runtime_keys == PackedStringArray(["health", "mode", "speed"]), "runtime_keys lists the edited paths, sorted")
 	_check(zp.describe().contains("runtime keys set: health, mode, speed"), "describe shows the runtime keys")
-	_check((w["ss"].load_profile("ghoul").value as DotProfile).runtime_keys.is_empty(), "an unedited profile has no runtime keys")
+	_check((w["ss"].load_profile("ghoul").value as GSProfile).runtime_keys.is_empty(), "an unedited profile has no runtime keys")
 	var again := server.handle_request("admin", _req("set", "zombie", "mode", "ranged"))
 	_check(again.ok and again.value["changed"] == false and server.revision("npc", "zombie") == 3, "an identical edit is a no-op")
 
@@ -130,7 +130,7 @@ func _test_edit() -> void:
 func _test_refused() -> void:
 	_section("invalid edits are refused with a code and change nothing")
 	var w := _world()
-	var server: DotProfileRuntime = w["server"]
+	var server: GSProfileRuntime = w["server"]
 	var cases := {
 		"above max": ["health", 5000], "below min": ["health", 0], "wrong type": ["health", "lots"],
 		"fractional int": ["health", 2.5], "NaN": ["speed", NAN], "inf": ["speed", INF],
@@ -141,30 +141,30 @@ func _test_refused() -> void:
 	for name in cases:
 		var r := server.handle_request("admin", _req("set", "zombie", cases[name][0], cases[name][1]))
 		var code := "" if r.ok else r.error.code
-		_check(not r.ok and (code == DotError.CODE_INVALID or code == DotError.CODE_FORBIDDEN), "%s refused (%s)" % [name, code])
+		_check(not r.ok and (code == GSError.CODE_INVALID or code == GSError.CODE_FORBIDDEN), "%s refused (%s)" % [name, code])
 	_check(server.revision("npc", "zombie") == 0 and _sent.is_empty(), "no revision bump and nothing broadcast")
 	_check(_val(w["ss"], "zombie", "health") == 50, "the profile is unchanged")
 	var missing := server.handle_request("admin", _req("set", "nobody", "health", 5))
-	_check(not missing.ok and missing.error.code == DotError.CODE_INVALID, "unknown profile refused")
-	var kind := server.handle_request("admin", DotProfileRuntime.make_request("set", "weapon", "x", "health", 5))
-	_check(not kind.ok and kind.error.code == DotError.CODE_INVALID, "unknown kind refused")
+	_check(not missing.ok and missing.error.code == GSError.CODE_INVALID, "unknown profile refused")
+	var kind := server.handle_request("admin", GSProfileRuntime.make_request("set", "weapon", "x", "health", 5))
+	_check(not kind.ok and kind.error.code == GSError.CODE_INVALID, "unknown kind refused")
 	var op := server.handle_request("admin", _req("explode", "zombie"))
-	_check(not op.ok and op.error.code == DotError.CODE_INVALID, "unknown op refused")
+	_check(not op.ok and op.error.code == GSError.CODE_INVALID, "unknown op refused")
 
 
 func _test_permission() -> void:
 	_section("permission gate")
 	var w := _world()
-	var server: DotProfileRuntime = w["server"]
+	var server: GSProfileRuntime = w["server"]
 	var r := server.handle_request("guest", _req("set", "zombie", "health", 400))
-	_check(not r.ok and r.error.code == DotError.CODE_FORBIDDEN, "a player without the flag is forbidden")
+	_check(not r.ok and r.error.code == GSError.CODE_FORBIDDEN, "a player without the flag is forbidden")
 	_check(_val(w["ss"], "zombie", "health") == 50 and _sent.is_empty(), "nothing applied or sent")
 	_check(server.handle_request("mod", _req("set", "zombie", "health", 400)).ok, "the edit flag is enough to edit")
 	var save := server.handle_request("mod", _req("save", "zombie"))
-	_check(not save.ok and save.error.code == DotError.CODE_FORBIDDEN, "saving needs the stronger flag")
-	var none := DotProfileRuntime.new()
+	_check(not save.ok and save.error.code == GSError.CODE_FORBIDDEN, "saving needs the stronger flag")
+	var none := GSProfileRuntime.new()
 	none.add_set(w["ss"])
-	_check(none.handle_request("admin", _req("set", "zombie", "health", 9)).error.code == DotError.CODE_FORBIDDEN, "no permit callable denies everything")
+	_check(none.handle_request("admin", _req("set", "zombie", "health", 9)).error.code == GSError.CODE_FORBIDDEN, "no permit callable denies everything")
 	var denied: Array = _records.filter(func(rec: Dictionary) -> bool: return rec["message"] == "profile edit denied")
 	_check(denied.size() >= 3, "denials are logged")
 
@@ -172,8 +172,8 @@ func _test_permission() -> void:
 func _test_revisions() -> void:
 	_section("client applies only newer revisions")
 	var w := _world()
-	var server: DotProfileRuntime = w["server"]
-	var client: DotProfileRuntime = w["client"]
+	var server: GSProfileRuntime = w["server"]
+	var client: GSProfileRuntime = w["client"]
 	server.handle_request("admin", _req("set", "zombie", "health", 100))
 	server.handle_request("admin", _req("set", "zombie", "health", 200))
 	var r1: Dictionary = _sent[0]
@@ -190,12 +190,12 @@ func _test_revisions() -> void:
 func _test_late_join() -> void:
 	_section("a late joiner receives the full runtime layer")
 	var w := _world()
-	var server: DotProfileRuntime = w["server"]
+	var server: GSProfileRuntime = w["server"]
 	server.handle_request("admin", _req("set", "zombie", "health", 300))
 	server.handle_request("admin", _req("set", "zombie", "boss", true))
 	server.handle_request("admin", _req("set", "ghoul", "speed", 9.5))
 	server.handle_request("admin", _req("reset", "ghoul"))
-	var late := DotProfileRuntime.new()
+	var late := GSProfileRuntime.new()
 	var late_set := _mk()
 	late.add_set(late_set)
 	server.send_snapshot(7)
@@ -212,7 +212,7 @@ func _test_late_join() -> void:
 func _test_reset() -> void:
 	_section("reset key and reset profile")
 	var w := _world()
-	var server: DotProfileRuntime = w["server"]
+	var server: GSProfileRuntime = w["server"]
 	server.handle_request("admin", _req("set", "zombie", "health", 300))
 	server.handle_request("admin", _req("set", "zombie", "speed", 9.0))
 	var r := server.handle_request("admin", _req("reset_key", "zombie", "health"))
@@ -227,7 +227,7 @@ func _test_reset() -> void:
 func _test_save() -> void:
 	_section("save writes only the changed keys")
 	var w := _world()
-	var server: DotProfileRuntime = w["server"]
+	var server: GSProfileRuntime = w["server"]
 	server.handle_request("admin", _req("set", "zombie", "health", 300))
 	server.handle_request("admin", _req("set", "zombie", "mode", "ranged"))
 	server.handle_request("admin", _req("set", "zombie", "loot", ["coin", "gem"]))
@@ -236,39 +236,39 @@ func _test_save() -> void:
 	var r := server.handle_request("admin", _req("save", "zombie"))
 	_check(r.ok, "saved")
 	var file: String = BASE.path_join("server/game/mygame/npc/zombie.yml")
-	var parsed := DotYaml.parse_file(file)
+	var parsed := GSYaml.parse_file(file)
 	_check(parsed.ok and (parsed.value as Dictionary).keys().size() == 5, "five keys, not the whole profile")
 	_check(not (parsed.value as Dictionary).has("speed") and not (parsed.value as Dictionary).has("boss"), "unedited keys are absent")
 	var fresh := _mk()
-	var p: DotProfile = fresh.load_profile("zombie").value
+	var p: GSProfile = fresh.load_profile("zombie").value
 	_check(p.get_value("health") == 300 and p.get_value("mode") == "ranged" and p.get_value("loot") == ["coin", "gem"], "the file loads back as the same values")
 	_check(p.get_value("stats") == {"armor": 2} and p.get_extra("sound.growl") == "low \"mean\"", "nested and extra paths round trip")
 	_check(p.get_value("speed") == 2.5, "keys from lower tiers still show through")
 	server.handle_request("admin", _req("reset", "zombie"))
-	_check(server.handle_request("admin", _req("save", "zombie")).error.code == DotError.CODE_STATE, "nothing to save after a reset")
+	_check(server.handle_request("admin", _req("save", "zombie")).error.code == GSError.CODE_STATE, "nothing to save after a reset")
 	server.handle_request("admin", _req("set", "zombie", "speed", 4.0))
 	server.handle_request("admin", _req("save", "zombie"))
-	var merged := DotYaml.parse_file(file).value as Dictionary
+	var merged := GSYaml.parse_file(file).value as Dictionary
 	_check(merged.size() == 6 and merged["speed"] == 4.0 and merged["health"] == 300, "a second save keeps the earlier server keys")
-	var ss: DotProfileSet = w["ss"]
+	var ss: GSProfileSet = w["ss"]
 	ss.game = "../evil"
 	server.handle_request("admin", _req("set", "zombie", "speed", 5.0))
 	var evil := server.handle_request("admin", _req("save", "zombie"))
-	_check(not evil.ok and evil.error.code == DotError.CODE_INVALID, "a game name with .. is refused on save")
+	_check(not evil.ok and evil.error.code == GSError.CODE_INVALID, "a game name with .. is refused on save")
 	_check(not FileAccess.file_exists(BASE.path_join("server/evil/npc/zombie.yml")), "and nothing is written outside the game folder")
 
 
 func _test_audit() -> void:
 	_section("audit line")
 	var w := _world()
-	var server: DotProfileRuntime = w["server"]
+	var server: GSProfileRuntime = w["server"]
 	server.actor_name = func(actor: Variant) -> String: return "name:" + str(actor)
 	_records.clear()
 	server.handle_request("admin", _req("set", "zombie", "health", 400))
 	var lines: Array = _records.filter(func(rec: Dictionary) -> bool: return rec["message"] == "profile edited")
 	_check(lines.size() == 1, "one INFO line per edit")
 	var f: Dictionary = lines[0]["fields"] if lines.size() > 0 else {}
-	_check(lines.size() > 0 and lines[0]["level"] == DotLog.Level.INFO and lines[0]["channel"] == "profile", "INFO on channel profile")
+	_check(lines.size() > 0 and lines[0]["level"] == GSLog.Level.INFO and lines[0]["channel"] == "profile", "INFO on channel profile")
 	_check(f.get("who") == "name:admin" and f.get("key") == "health" and f.get("old") == "50" and f.get("new") == "400" and f.get("rev") == 1, "who, what, old, new and revision are in it")
 	_records.clear()
 	server.handle_request("admin", _req("set", "zombie", "health", 9999))
@@ -279,7 +279,7 @@ func _test_nested() -> void:
 	_section("edits survive extends and the cache")
 	var w := _world()
 	_w("addon/dot-npc/npc/boss.yml", "extends: zombie\nhealth: 500\n")
-	var server: DotProfileRuntime = w["server"]
+	var server: GSProfileRuntime = w["server"]
 	var before: Variant = _val(w["ss"], "boss", "health")
 	server.handle_request("admin", _req("set", "zombie", "health", 1))
 	_check(before == 500 and _val(w["ss"], "boss", "health") == 500, "a child's own value is not changed by its parent's runtime edit")
@@ -293,10 +293,10 @@ func _test_nested() -> void:
 func _test_add_delete() -> void:
 	_section("profiles are added, replicated, saved, deleted and brought back")
 	var w := _world()
-	var server: DotProfileRuntime = w["server"]
-	var client: DotProfileRuntime = w["client"]
-	var ss: DotProfileSet = w["ss"]
-	var cs: DotProfileSet = w["cs"]
+	var server: GSProfileRuntime = w["server"]
+	var client: GSProfileRuntime = w["client"]
+	var ss: GSProfileSet = w["ss"]
+	var cs: GSProfileSet = w["cs"]
 	var before := ss.list_ids().size()
 	var r := server.handle_request("admin", _req("add", "wraith", "", {"health": 77, "mode": "ranged"}))
 	_check(r.ok and ss.has_id("wraith") and ss.list_ids().size() == before + 1, "add makes a new profile that lists")

@@ -4,4 +4,4 @@ extends RefCounted
 
 
 static func profile_schemas() -> Dictionary:
-	return {"thing": [DotProfileSet.field.call("hp", "int", 1)]}
+	return {"thing": [GSProfileSet.field.call("hp", "int", 1)]}
